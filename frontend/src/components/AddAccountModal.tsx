@@ -23,6 +23,7 @@ import {
   startDeviceLogin,
   type ProviderDescriptor,
 } from '@/api/overview'
+import { detectImportBundle, kiroRegionOf } from '@/lib/accountImportDetect'
 import {
   normalizeWorkbuddyImportBundle,
   summarizeWorkbuddyImportResult,
@@ -463,18 +464,49 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
       setMessage(t('wizardBadJson'))
       return
     }
+    if (Array.isArray(bundle)) {
+      if (!bundle.every((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))) {
+        setMessage(t('wizardBadJson'))
+        return
+      }
+      bundle = { accounts: bundle }
+    }
     if (!bundle || typeof bundle !== 'object') {
       setMessage(t('wizardBadJson'))
       return
     }
     if (!activeOption) { setMessage(t('accountTypeHint')); return }
-    if (activeOption.provider === 'qoder' && (typeof bundle.user_blob !== 'string' || typeof bundle.machine_id !== 'string')) {
+    const detected = detectImportBundle(bundle)
+    const provider = detected.provider || activeOption.provider
+    if (provider === 'qoder' && (typeof bundle.user_blob !== 'string' || typeof bundle.machine_id !== 'string')) {
       setMessage(t('wizardBadJson'))
       return
     }
     const options = accountOptions()
     let payload: Record<string, unknown>
-    if (activeOption.provider === 'workbuddy') {
+    if (provider === 'kiro') {
+      const email = typeof bundle.email === 'string' ? bundle.email.trim() : ''
+      const nickname = typeof bundle.nickname === 'string' ? bundle.nickname.trim() : ''
+      const detectedRegion = kiroRegionOf(bundle)
+      // provider on a Kiro credential is the IdP (Github, BuilderId), not the
+      // account family. Keep it inside the credential instead of overwriting it.
+      const { provider: credentialProvider, accounts: wrapped, ...rest } = bundle
+      const accounts = Array.isArray(wrapped)
+        ? wrapped
+        : [{ ...rest, ...(credentialProvider ? { provider: credentialProvider } : {}) }]
+      payload = {
+        format: 'kiro-oauth-v1',
+        provider: 'kiro',
+        region: detectedRegion || (activeOption.provider === 'kiro' ? activeOption.region : 'us-east-1'),
+        name: name.trim() || nickname || email || undefined,
+        enabled: true,
+        accounts,
+        max_inflight: options.max_inflight,
+        priority: options.priority,
+        drop_system_prompt: options.drop_system_prompt,
+        proxy_url: options.proxy_url,
+      }
+    } else if (provider === 'workbuddy') {
       // Shared normalize keeps hub workbuddy-accounts packs intact (same as batch import).
       payload = normalizeWorkbuddyImportBundle(bundle, {
         region: activeOption.region === 'global' ? 'global' : 'cn',
@@ -487,18 +519,23 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
       })
     } else {
       if (!bundle.format) {
-        if (activeOption.descriptor.id === 'trae') bundle.format = 'trae-oauth-v1'
-        else if (activeOption.descriptor.id === 'devin') bundle.format = 'devin-session-v1'
-        else if (activeOption.descriptor.id === 'command') bundle.format = 'command-key-v1'
-        else if (activeOption.descriptor.id === 'qwenwork') bundle.format = 'qwenwork-oauth-v1'
+        const id = provider
+        if (id === 'trae') bundle.format = 'trae-oauth-v1'
+        else if (id === 'devin') bundle.format = 'devin-session-v1'
+        else if (id === 'command') bundle.format = 'command-key-v1'
+        else if (id === 'qwenwork') bundle.format = 'qwenwork-oauth-v1'
+        else if (id === 'kimi') bundle.format = 'kimi-oauth-v1'
+        else if (id === 'codearts') bundle.format = 'codearts-oauth-v1'
+        else if (id === 'codex') bundle.format = 'codex-oauth-v1'
+        else if (id === 'meta') bundle.format = 'meta-oauth-v1'
         else bundle.format = 'qoder-native-v1'
       }
       payload = {
         ...bundle,
         name: name.trim() || bundle.name,
         enabled: true,
-        provider: activeOption.provider,
-        region: activeOption.region,
+        provider,
+        region: detected.region || activeOption.region,
         max_inflight: options.max_inflight,
         priority: options.priority,
         drop_system_prompt: options.drop_system_prompt,
