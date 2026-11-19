@@ -57,6 +57,14 @@ type Account struct {
 	UpdatedAt         time.Time      `json:"updated_at"`
 }
 
+type CheckinAllResult struct {
+	AccountID string `json:"account_id"`
+	Provider  string `json:"provider"`
+	Region    string `json:"region"`
+	Status    string `json:"status"`
+	Message   string `json:"message,omitempty"`
+}
+
 type CreateAccount struct {
 	AutoCheckin          *bool
 	CheckinTime          string
@@ -117,9 +125,9 @@ type ImportAccount struct {
 
 type AccountView struct {
 	Account
-	Ready               bool              `json:"ready"`
-	Hot                 bool              `json:"hot"`
-	InFlight            int               `json:"in_flight"`
+	Ready    bool `json:"ready"`
+	Hot      bool `json:"hot"`
+	InFlight int  `json:"in_flight"`
 	// InFlightSince is RFC3339 when the pool slot went busy (0→1); empty when idle.
 	InFlightSince       string            `json:"in_flight_since,omitempty"`
 	Restarts            int               `json:"restarts"`
