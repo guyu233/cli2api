@@ -185,9 +185,32 @@ func (b *Bridge) Checkin(ctx context.Context) (providers.CheckinResult, error) {
 	// 1) List campaigns. A successful response with nothing claimable is
 	// retried: the endpoint intermittently omits the daily campaign, and
 	// treating that single snapshot as final dropped the day's check-in.
+	// Global quota calls need a separate OpenAPI bearer, but the activity
+	// endpoint has also accepted the desktop COSY token. If the OpenAPI token
+	// authenticates yet returns no claimable credit campaign, retry the list
+	// once with the COSY token before declaring the activity closed.
+	cosyFallback := ""
+	if b.Region != nil && b.Region.NeedsOpenAPIToken {
+		cosyFallback = b.CurrentSecurityOauth()
+	}
+	campaignListFrom := func(raw map[string]any, err error) []campaign {
+		if err != nil {
+			return nil
+		}
+		return campaignsFrom(raw)
+	}
+
 	var items []campaign
 	for attempt, wait := range checkinListRetryWaits {
 		listRaw, _, err := doRequest(checkinCampaignsPath, http.MethodGet, false)
+		items = campaignListFrom(listRaw, err)
+		if err == nil && cosyFallback != "" && bearer != cosyFallback &&
+			!hasClaimableCreditCampaign(items) && attempt == 0 {
+			bearer = cosyFallback
+			cosyFallback = ""
+			listRaw, _, err = doRequest(checkinCampaignsPath, http.MethodGet, false)
+			items = campaignListFrom(listRaw, err)
+		}
 		if err != nil {
 			// 404 means the credit campaign is not open today; surface as skipped
 			// rather than an error so the scheduler logs a clean "already/none".
@@ -456,6 +479,15 @@ func creditCampaigns(items []campaign) []campaign {
 		}
 	}
 	return out
+}
+
+func hasClaimableCreditCampaign(items []campaign) bool {
+	for _, c := range creditCampaigns(items) {
+		if c.ClaimStatus == "CLAIMABLE" {
+			return true
+		}
+	}
+	return false
 }
 
 // campaignListNeedsRetry reports whether a successful listing should be
