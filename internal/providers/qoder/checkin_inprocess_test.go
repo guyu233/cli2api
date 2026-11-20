@@ -102,8 +102,8 @@ func TestBridgeCheckinHappyPath(t *testing.T) {
 		t.Fatalf("claim POST hits = %d want 2 (all CLAIMABLE CLAIM_BENEFIT)", claimHits.Load())
 	}
 
-	// Desktop identity only. A derived cosy-machine* set hides the daily
-	// credit campaign, so none of those headers may be sent.
+	// Desktop identity + activity-page headers. A derived cosy-machine* set
+	// hides the daily credit campaign, so none of those headers may be sent.
 	if got := gotHeaders.Get("Authorization"); !strings.HasPrefix(got, "Bearer ") {
 		t.Fatalf("Authorization = %q want Bearer <token>", got)
 	}
@@ -116,12 +116,18 @@ func TestBridgeCheckinHappyPath(t *testing.T) {
 	if got := gotHeaders.Get("Cosy-Version"); got != "0.4.8" {
 		t.Fatalf("Cosy-Version = %q want 0.4.8", got)
 	}
+	if got := gotHeaders.Get("Origin"); got != "https://stub.test" {
+		t.Fatalf("Origin = %q want activity page origin", got)
+	}
+	if got := gotHeaders.Get("Referer"); got != openapi.URL+"/growth-page/activity-iframe" {
+		t.Fatalf("Referer = %q want activity iframe referer", got)
+	}
 	for _, key := range []string{
 		"Cosy-Machineid", "Cosy-Machinetoken", "Cosy-Machinetype", "Cosy-Machinecode",
-		"Cosy-Machineos", "Cosy-Machinehostname", "Origin", "Referer",
+		"Cosy-Machineos", "Cosy-Machinehostname",
 	} {
 		if got := gotHeaders.Get(key); got != "" {
-			t.Fatalf("%s = %q, derived machine/browser headers must be omitted", key, got)
+			t.Fatalf("%s = %q, derived machine headers must be omitted", key, got)
 		}
 	}
 }
