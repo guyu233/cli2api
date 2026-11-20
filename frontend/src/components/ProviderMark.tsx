@@ -3,6 +3,7 @@ import { CodexMark } from '@/components/CodexMark'
 import { DevinMark } from '@/components/DevinMark'
 import { KiroMark } from '@/components/KiroMark'
 import { KimiMark } from '@/components/KimiMark'
+import { MiniMaxCodeMark } from '@/components/MiniMaxCodeMark'
 import { MuseMark } from '@/components/MuseMark'
 import { QoderMark } from '@/components/QoderMark'
 import { QwenworkMark } from '@/components/QwenworkMark'
@@ -48,6 +49,9 @@ export function ProviderMark({ provider, size = 16, className = '' }: Props) {
   }
   if (id === 'meta' || id === 'muse') {
     return <MuseMark size={size} className={className} />
+  }
+  if (id === 'minimaxcode') {
+    return <MiniMaxCodeMark size={size} className={className} />
   }
   return <QoderMark size={size} className={className} />
 }
