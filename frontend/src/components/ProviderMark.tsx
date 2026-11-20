@@ -1,4 +1,5 @@
 import { CommandMark } from '@/components/CommandMark'
+import { CodeArtsMark } from '@/components/CodeArtsMark'
 import { CodexMark } from '@/components/CodexMark'
 import { DevinMark } from '@/components/DevinMark'
 import { KiroMark } from '@/components/KiroMark'
@@ -37,6 +38,9 @@ export function ProviderMark({ provider, size = 16, className = '' }: Props) {
   }
   if (id === 'zhipu') {
     return <ZhipuMark size={size} className={className} />
+  }
+  if (id === 'codearts') {
+    return <CodeArtsMark size={size} className={className} />
   }
   if (id === 'qwenwork') {
     return <QwenworkMark size={size} className={className} />
