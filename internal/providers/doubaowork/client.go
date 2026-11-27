@@ -29,6 +29,9 @@ type Store interface {
 	LoadCredentialPayload(ctx context.Context, accountID string) (string, []byte, error)
 	SaveCredentialPayload(ctx context.Context, accountID, format string, payload []byte) error
 	Observe(ctx context.Context, id, remoteUID, status, lastError, lastKind string) error
+	BeginCheckinClaim(ctx context.Context, accountID, day string) (bool, string, error)
+	CompleteCheckinClaim(ctx context.Context, accountID, day, status, message string, at time.Time) error
+	CheckinClaimStatus(ctx context.Context, accountID, day string) (string, string, bool, error)
 }
 
 // SecretReader is optional. Missing it means no global proxy.
@@ -65,6 +68,9 @@ type Client struct {
 	sessions map[string]*session
 	catalogs map[string]catalogCache
 	failedAt map[string]time.Time
+
+	checkinMu sync.Mutex
+	checkins  map[string]claimGuardEntry
 }
 
 // LoginConfig configures the short-lived browser login helper.
@@ -101,6 +107,7 @@ func NewClient(store Store) *Client {
 		sessions: map[string]*session{},
 		catalogs: map[string]catalogCache{},
 		failedAt: map[string]time.Time{},
+		checkins: map[string]claimGuardEntry{},
 	}
 }
 

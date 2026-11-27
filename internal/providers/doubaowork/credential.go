@@ -35,14 +35,22 @@ type Cookie struct {
 	HTTPOnly bool   `json:"http_only,omitempty"`
 }
 
-// ClientInfo carries the desktop device identifiers the upstream validates.
-// Fingerprint is the real s_v_web_id; it is never synthesized.
+// ClientInfo carries the browser/desktop identifiers the upstream validates.
+// Fingerprint is the real s_v_web_id; it is never synthesized. The web-context
+// fields are optional and keep Cookie-only imports working: an empty value
+// means "not observed yet", never a fabricated browser value.
 type ClientInfo struct {
-	WebID       string `json:"web_id,omitempty"`
-	DeviceID    string `json:"device_id,omitempty"`
-	TeaUUID     string `json:"tea_uuid,omitempty"`
-	Fingerprint string `json:"fingerprint,omitempty"`
-	Ttwid       string `json:"ttwid,omitempty"`
+	WebID           string `json:"web_id,omitempty"`
+	DeviceID        string `json:"device_id,omitempty"`
+	TeaUUID         string `json:"tea_uuid,omitempty"`
+	Fingerprint     string `json:"fingerprint,omitempty"`
+	Ttwid           string `json:"ttwid,omitempty"`
+	AppID           string `json:"app_id,omitempty"`
+	ClientVersion   string `json:"client_version,omitempty"`
+	ChromiumVersion string `json:"chromium_version,omitempty"`
+	Channel         string `json:"channel,omitempty"`
+	UserAgent       string `json:"user_agent,omitempty"`
+	ClientProfile   string `json:"client_profile,omitempty"`
 }
 
 // Credential is the canonical doubaowork-cookie-v1 payload stored per account.
@@ -72,6 +80,7 @@ func (c Credential) Encode() ([]byte, error) {
 	c.Bot = strings.TrimSpace(c.Bot)
 	c.Cookies = normalizeCookies(c.Cookies)
 	c.ClientInfo = mergeClientInfo(c.ClientInfo, ClientInfoFromCookies(c.Cookies))
+	c.ClientVersion = firstNonEmpty(c.ClientVersion, c.ClientInfo.ClientVersion)
 	return json.Marshal(c)
 }
 
@@ -235,11 +244,17 @@ func normalizeCookies(cookies []Cookie) []Cookie {
 // mergeClientInfo keeps non-empty values from primary, filling gaps from extra.
 func mergeClientInfo(primary, extra ClientInfo) ClientInfo {
 	return ClientInfo{
-		WebID:       firstNonEmpty(primary.WebID, extra.WebID),
-		DeviceID:    firstNonEmpty(primary.DeviceID, extra.DeviceID),
-		TeaUUID:     firstNonEmpty(primary.TeaUUID, extra.TeaUUID),
-		Fingerprint: firstNonEmpty(primary.Fingerprint, extra.Fingerprint),
-		Ttwid:       firstNonEmpty(primary.Ttwid, extra.Ttwid),
+		WebID:           firstNonEmpty(primary.WebID, extra.WebID),
+		DeviceID:        firstNonEmpty(primary.DeviceID, extra.DeviceID),
+		TeaUUID:         firstNonEmpty(primary.TeaUUID, extra.TeaUUID),
+		Fingerprint:     firstNonEmpty(primary.Fingerprint, extra.Fingerprint),
+		Ttwid:           firstNonEmpty(primary.Ttwid, extra.Ttwid),
+		AppID:           firstNonEmpty(primary.AppID, extra.AppID),
+		ClientVersion:   firstNonEmpty(primary.ClientVersion, extra.ClientVersion),
+		ChromiumVersion: firstNonEmpty(primary.ChromiumVersion, extra.ChromiumVersion),
+		Channel:         firstNonEmpty(primary.Channel, extra.Channel),
+		UserAgent:       firstNonEmpty(primary.UserAgent, extra.UserAgent),
+		ClientProfile:   firstNonEmpty(primary.ClientProfile, extra.ClientProfile),
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,9 +15,12 @@ import (
 )
 
 type fakeStore struct {
-	mu       sync.Mutex
-	payload  []byte
-	observed string
+	mu        sync.Mutex
+	payload   []byte
+	observed  string
+	claims    map[string]string
+	begins    int
+	completes int
 }
 
 func (f *fakeStore) Get(context.Context, string) (accounts.Account, error) {
@@ -34,6 +38,46 @@ func (f *fakeStore) Observe(_ context.Context, _ string, remoteUID, status, _, _
 	defer f.mu.Unlock()
 	f.observed = status + ":" + remoteUID
 	return nil
+}
+
+func (f *fakeStore) BeginCheckinClaim(_ context.Context, accountID, day string) (bool, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.begins++
+	if f.claims == nil {
+		f.claims = map[string]string{}
+	}
+	key := accountID + "|" + day
+	if status, ok := f.claims[key]; ok {
+		return false, status, nil
+	}
+	f.claims[key] = "pending"
+	return true, "pending", nil
+}
+
+func (f *fakeStore) CompleteCheckinClaim(_ context.Context, accountID, day, status, message string, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.completes++
+	if f.claims == nil {
+		f.claims = map[string]string{}
+	}
+	f.claims[accountID+"|"+day] = status + "|" + message
+	return nil
+}
+
+func (f *fakeStore) CheckinClaimStatus(_ context.Context, accountID, day string) (string, string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	value, ok := f.claims[accountID+"|"+day]
+	if !ok {
+		return "", "", false, nil
+	}
+	parts := strings.SplitN(value, "|", 2)
+	if len(parts) == 1 {
+		return parts[0], "", true, nil
+	}
+	return parts[0], parts[1], true, nil
 }
 
 func credentialPayload(t *testing.T, uidHint string) []byte {
@@ -141,6 +185,28 @@ func TestBootstrapRejectsUIDMismatch(t *testing.T) {
 	err := client.sessionFor("acc1").ready(context.Background())
 	if err == nil {
 		t.Fatal("expected uid mismatch rejection")
+	}
+}
+
+func TestBuildURLUsesObservedWebContext(t *testing.T) {
+	sess := &session{
+		client:        &Client{baseURL: "https://www.doubao.com"},
+		clientInfo:    ClientInfo{AppID: "1044603", Channel: "chrome", ChromiumVersion: "147", ClientProfile: "web"},
+		clientVersion: "2.8.0",
+	}
+	target, err := sess.buildURL("/alice/ug/campaign/v3/detail/", map[string]string{"campaign_group_code": "g1"})
+	if err != nil {
+		t.Fatalf("buildURL: %v", err)
+	}
+	query := target.Query()
+	if query.Get("aid") != "1044603" || query.Get("real_aid") != "1044603" {
+		t.Fatalf("app id not applied: %s", target)
+	}
+	if query.Get("pc_version") != "2.8.0" || query.Get("channel") != "chrome" || query.Get("chromium_version") != "147" {
+		t.Fatalf("web context not applied: %s", target)
+	}
+	if query.Get("campaign_group_code") != "g1" {
+		t.Fatalf("extra query missing: %s", target)
 	}
 }
 

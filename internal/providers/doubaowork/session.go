@@ -53,6 +53,7 @@ type session struct {
 	uid           string
 	bot           string
 	country       string
+	campaignGroup string
 	clientInfo    ClientInfo
 	clientVersion string
 
@@ -143,7 +144,7 @@ func (s *session) initialize(ctx context.Context) error {
 	}
 	s.jar = newCookieJar(credential.Cookies)
 	s.clientInfo = credential.ClientInfo
-	s.clientVersion = credential.ClientVersion
+	s.clientVersion = firstNonEmpty(credential.ClientVersion, credential.ClientInfo.ClientVersion)
 
 	identity, err := s.json(ctx, http.MethodGet, "/passport/account/info/v2/", nil, map[string]string{
 		"account_sdk_source": "web",
@@ -167,6 +168,14 @@ func (s *session) initialize(ctx context.Context) error {
 		return err
 	}
 
+	campaignGroup := ""
+	if info, ok := launch["ug_campaign_info"].(map[string]any); ok {
+		campaignGroup = strings.TrimSpace(asString(info["campaign_group_code"]))
+	}
+	if campaignGroup == "" {
+		campaignGroup = strings.TrimSpace(asString(launch["campaign_group_code"]))
+	}
+
 	bot := strings.TrimSpace(asString(launch["assistant_bot_id"]))
 	if !isPositiveInt(bot) {
 		bot = firstNonEmpty(credential.Bot, FallbackBot)
@@ -175,6 +184,12 @@ func (s *session) initialize(ctx context.Context) error {
 	config, _ := launch["config"].(map[string]any)
 	webID := strings.TrimSpace(asString(config["web_id"]))
 	ttwid := strings.TrimSpace(asString(config["ttwid"]))
+	if appID := strings.TrimSpace(asString(config["aid"])); appID != "" && s.clientInfo.AppID == "" {
+		s.clientInfo.AppID = appID
+	}
+	if version := strings.TrimSpace(asString(config["pc_version"])); version != "" && s.clientVersion == "" {
+		s.clientVersion = version
+	}
 	if isPositiveInt(webID) {
 		if s.clientInfo.WebID == "" {
 			s.clientInfo.WebID = webID
@@ -194,6 +209,7 @@ func (s *session) initialize(ctx context.Context) error {
 	s.uid = uid
 	s.bot = bot
 	s.country = strings.TrimSpace(asString(launch["country"]))
+	s.campaignGroup = campaignGroup
 	s.readyAt = time.Now()
 	s.mu.Unlock()
 	return nil
@@ -215,9 +231,25 @@ func (s *session) buildURL(path string, extra map[string]string) (*url.URL, erro
 	for key, value := range desktopParams {
 		query.Set(key, value)
 	}
-	if s.clientVersion != "" {
-		query.Set("pc_version", s.clientVersion)
-		query.Set("doubao_pc_version", s.clientVersion)
+	if s.clientInfo.AppID != "" {
+		// The official /chat/ layout exposes the active app id. Keep the
+		// hard-coded chat default only when no observed value exists.
+		query.Set("aid", s.clientInfo.AppID)
+		query.Set("real_aid", s.clientInfo.AppID)
+	}
+	if s.clientInfo.ClientProfile == "web" {
+		query.Set("web_platform", "browser")
+		query.Set("doubao_device_platform", "web")
+	}
+	if s.clientInfo.Channel != "" {
+		query.Set("channel", s.clientInfo.Channel)
+	}
+	if s.clientInfo.ChromiumVersion != "" {
+		query.Set("chromium_version", s.clientInfo.ChromiumVersion)
+	}
+	if version := firstNonEmpty(s.clientVersion, s.clientInfo.ClientVersion); version != "" {
+		query.Set("pc_version", version)
+		query.Set("doubao_pc_version", version)
 	}
 	if s.clientInfo.WebID != "" {
 		query.Set("web_id", s.clientInfo.WebID)
@@ -262,7 +294,7 @@ func (s *session) request(ctx context.Context, method, path string, body any, ex
 	req.Header.Set("Agw-Js-Conv", "str")
 	req.Header.Set("Origin", s.client.baseURL)
 	req.Header.Set("Referer", s.client.baseURL+"/")
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", firstNonEmpty(s.clientInfo.UserAgent, userAgent))
 	if s.jar != nil {
 		if cookie := s.jar.headerFor(target); cookie != "" {
 			req.Header.Set("Cookie", cookie)

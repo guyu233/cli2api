@@ -75,3 +75,17 @@ func TestMiniMaxCodeAdvertisesDailyCheckin(t *testing.T) {
 		t.Fatal("minimaxcode descriptor must support check-in")
 	}
 }
+
+func TestDoubaoWorkAdvertisesDailyCheckin(t *testing.T) {
+	policy, ok := CheckinFor("doubaowork", "cn")
+	if !ok || policy == nil {
+		t.Fatal("doubaowork check-in not advertised")
+	}
+	if policy.Timezone != "Asia/Shanghai" {
+		t.Fatalf("timezone=%q", policy.Timezone)
+	}
+	descriptor, ok := Get("doubaowork")
+	if !ok || !descriptor.SupportsCheckin() {
+		t.Fatal("doubaowork descriptor must support check-in")
+	}
+}

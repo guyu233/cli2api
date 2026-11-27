@@ -66,7 +66,7 @@ func TestDecodeCredentialRejectsMissingSession(t *testing.T) {
 }
 
 func TestCredentialEncodeRoundTrip(t *testing.T) {
-	raw := `{"cookies":[{"name":"sessionid","value":"abc"}],"uid":"u1","bot":"b1"}`
+	raw := `{"cookies":[{"name":"sessionid","value":"abc"}],"uid":"u1","bot":"b1","client_version":"2.8.0","client_info":{"app_id":"1044603","chromium_version":"147","channel":"chrome","user_agent":"test-agent"}}`
 	cred, err := DecodeCredential([]byte(raw))
 	if err != nil {
 		t.Fatalf("decode: %v", err)
@@ -81,6 +81,12 @@ func TestCredentialEncodeRoundTrip(t *testing.T) {
 	}
 	if back.Format != CredentialFormat || back.UID != "u1" || !back.Ready() {
 		t.Fatalf("unexpected round trip: %+v", back)
+	}
+	if back.ClientInfo.AppID != "1044603" || back.ClientInfo.Channel != "chrome" || back.ClientInfo.UserAgent != "test-agent" {
+		t.Fatalf("web context not preserved: %+v", back.ClientInfo)
+	}
+	if back.ClientVersion != "2.8.0" {
+		t.Fatalf("client version not preserved: %q", back.ClientVersion)
 	}
 	// Device identifiers must not be synthesized when absent.
 	if back.ClientInfo.Fingerprint != "" {

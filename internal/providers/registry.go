@@ -440,6 +440,7 @@ var DoubaoWork = ProviderDescriptor{
 			ID: "cn", Label: "CN", ChatBase: "https://www.doubao.com",
 			BillingBase: "https://www.doubao.com", AuthBase: "https://www.doubao.com",
 			DefaultDomain: "doubao.com",
+			Checkin:       &CheckinPolicy{Timezone: "Asia/Shanghai"},
 		},
 	},
 	DefaultRegion: "cn",

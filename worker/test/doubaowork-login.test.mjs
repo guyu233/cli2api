@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isDoubaoSession, normalizeCookies } from "../src/doubaowork-login.mjs";
+import { isDoubaoSession, normalizeCookies, normalizeWebContext } from "../src/doubaowork-login.mjs";
 
 test("recognises a doubao session cookie", () => {
   assert.equal(isDoubaoSession({ name: "sessionid", value: "abc", domain: ".doubao.com" }), true);
@@ -23,4 +23,26 @@ test("normalises only doubao cookies into the provider credential shape", () => 
   });
   assert.equal(out[1].http_only, false);
   assert.equal(out[1].path, "/");
+});
+
+test("keeps only observed web context values", () => {
+  const web = normalizeWebContext({
+    web_id: " 555 ",
+    device_id: " dev-1 ",
+    client_version: " 2.8.0 ",
+    chromium_version: " 147 ",
+    channel: " chrome ",
+    user_agent: " Mozilla/5.0 ",
+    ignored: "nope",
+  });
+  assert.deepEqual(web, {
+    web_id: "555",
+    device_id: "dev-1",
+    client_version: "2.8.0",
+    chromium_version: "147",
+    channel: "chrome",
+    user_agent: "Mozilla/5.0",
+    client_profile: "web",
+  });
+  assert.equal(normalizeWebContext().web_id, "");
 });

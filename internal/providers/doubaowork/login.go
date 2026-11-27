@@ -28,6 +28,12 @@ type loginState struct {
 	message   string
 }
 
+type loginOutput struct {
+	Cookies       []Cookie
+	ClientInfo    ClientInfo
+	ClientVersion string
+}
+
 const (
 	loginAttemptTimeout = 180 * time.Second
 	headlessLoginProbe  = 8 * time.Second
@@ -100,9 +106,9 @@ func (c *Client) runLogin(node, script, profileDir, chrome, accountID string, st
 			timeout = interactiveLogin
 		}
 		clearCookies := !headless && staleProfile
-		cookies, err := runLoginAttempt(ctx, node, script, profileDir, chrome, headless, timeout, clearCookies)
-		if err == nil && len(cookies) > 0 {
-			if verifyErr := c.validateLoginCookies(ctx, accountID, cookies); verifyErr != nil {
+		attempt, err := runLoginAttempt(ctx, node, script, profileDir, chrome, headless, timeout, clearCookies)
+		if err == nil && len(attempt.Cookies) > 0 {
+			if verifyErr := c.validateLoginCookies(ctx, accountID, attempt.Cookies); verifyErr != nil {
 				if headless {
 					// The persistent profile holds an expired session. Clear it
 					// before opening the visible window so the operator can
@@ -114,11 +120,11 @@ func (c *Client) runLogin(node, script, profileDir, chrome, accountID string, st
 				state.setResult(nil, verifyErr, "")
 				return
 			}
-			if err := c.saveLoginCookies(ctx, accountID, cookies); err != nil {
+			if err := c.saveLoginCookies(ctx, accountID, attempt); err != nil {
 				state.setResult(nil, err, "")
 				return
 			}
-			state.setResult(cookies, nil, "登录成功")
+			state.setResult(attempt.Cookies, nil, "登录成功")
 			return
 		}
 		// Headless miss is expected on a cold profile; go interactive.
@@ -135,7 +141,7 @@ func (c *Client) runLogin(node, script, profileDir, chrome, accountID string, st
 }
 
 // runLoginAttempt executes one Playwright login attempt and decodes its JSON.
-func runLoginAttempt(ctx context.Context, node, script, profileDir, chrome string, headless bool, timeout time.Duration, clearCookies bool) ([]Cookie, error) {
+func runLoginAttempt(ctx context.Context, node, script, profileDir, chrome string, headless bool, timeout time.Duration, clearCookies bool) (loginOutput, error) {
 	args := []string{
 		script, "--user-data-dir", profileDir,
 		"--headless", boolFlag(headless),
@@ -150,25 +156,31 @@ func runLoginAttempt(ctx context.Context, node, script, profileDir, chrome strin
 	cmd := exec.CommandContext(ctx, node, args...)
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("login helper: %w", err)
+		return loginOutput{}, fmt.Errorf("login helper: %w", err)
 	}
 	line := strings.TrimSpace(string(out))
 	if line == "" {
-		return nil, fmt.Errorf("login helper returned empty output")
+		return loginOutput{}, fmt.Errorf("login helper returned empty output")
 	}
 	var result struct {
-		OK      bool     `json:"ok"`
-		Error   string   `json:"error"`
-		Message string   `json:"message"`
-		Cookies []Cookie `json:"cookies"`
+		OK            bool       `json:"ok"`
+		Error         string     `json:"error"`
+		Message       string     `json:"message"`
+		Cookies       []Cookie   `json:"cookies"`
+		ClientInfo    ClientInfo `json:"client_info"`
+		ClientVersion string     `json:"client_version"`
 	}
 	if err := json.Unmarshal([]byte(line), &result); err != nil {
-		return nil, fmt.Errorf("decode login helper output: %w", err)
+		return loginOutput{}, fmt.Errorf("decode login helper output: %w", err)
 	}
 	if !result.OK {
-		return nil, fmt.Errorf("login helper: %s: %s", result.Error, result.Message)
+		return loginOutput{}, fmt.Errorf("login helper: %s: %s", result.Error, result.Message)
 	}
-	return result.Cookies, nil
+	return loginOutput{
+		Cookies:       result.Cookies,
+		ClientInfo:    result.ClientInfo,
+		ClientVersion: result.ClientVersion,
+	}, nil
 }
 
 // PollLogin reports login progress without blocking: the console polls every
@@ -198,8 +210,12 @@ func (c *Client) PollLogin(ctx context.Context, accountID string) (bool, string,
 	}
 }
 
-func (c *Client) saveLoginCookies(ctx context.Context, accountID string, cookies []Cookie) error {
-	cred := Credential{Cookies: cookies}
+func (c *Client) saveLoginCookies(ctx context.Context, accountID string, attempt loginOutput) error {
+	cred := Credential{
+		Cookies:       attempt.Cookies,
+		ClientInfo:    attempt.ClientInfo,
+		ClientVersion: attempt.ClientVersion,
+	}
 	encoded, err := cred.Encode()
 	if err != nil {
 		return err

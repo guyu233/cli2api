@@ -62,6 +62,48 @@ export function normalizeCookies(all) {
     }));
 }
 
+// Keep only values the browser actually produced. Missing fields stay empty;
+// the Go side never fabricates a fingerprint or device identity.
+export function normalizeWebContext(raw = {}) {
+  const text = (value) => (typeof value === 'string' ? value.trim() : '');
+  return {
+    web_id: text(raw.web_id),
+    device_id: text(raw.device_id),
+    client_version: text(raw.client_version),
+    chromium_version: text(raw.chromium_version),
+    channel: text(raw.channel),
+    user_agent: text(raw.user_agent),
+    client_profile: 'web',
+  };
+}
+
+async function readWebContext(page) {
+  const raw = await page.evaluate(() => {
+    const read = (key) => {
+      try {
+        return localStorage.getItem(key) || '';
+      } catch {
+        return '';
+      }
+    };
+    let device = {};
+    try {
+      device = JSON.parse(read('client_device_info') || '{}');
+    } catch {
+      device = {};
+    }
+    return {
+      web_id: read('samantha_web_web_id') || read('web_id'),
+      device_id: device.deviceId || device.device_id || '',
+      client_version: device.clientVersion || device.client_version || '',
+      chromium_version: device.chromiumVersion || device.chromium_version || '',
+      channel: device.appChannel || device.channel || '',
+      user_agent: navigator.userAgent || '',
+    };
+  }).catch(() => ({}));
+  return normalizeWebContext(raw);
+}
+
 async function hasSession(context) {
   const cookies = await context.cookies();
   return cookies.some(isDoubaoSession);
@@ -157,7 +199,13 @@ async function run() {
     }
 
     const all = await context.cookies();
-    emit({ ok: true, cookies: normalizeCookies(all) });
+    const webContext = await readWebContext(page);
+    emit({
+      ok: true,
+      cookies: normalizeCookies(all),
+      client_info: webContext,
+      client_version: webContext.client_version,
+    });
   } catch (err) {
     emit({
       ok: false,

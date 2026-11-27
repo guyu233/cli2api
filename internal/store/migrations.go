@@ -298,6 +298,17 @@ ALTER TABLE aggregation_models ADD COLUMN reasoning_effort TEXT NOT NULL DEFAULT
 DELETE FROM account_cooldowns
  WHERE account_id IN (SELECT id FROM accounts WHERE provider = 'doubaowork');
 DELETE FROM accounts WHERE provider = 'doubaowork';`},
+	{filename: "036_checkin_claim_ledger.sql", sql: `
+CREATE TABLE IF NOT EXISTS checkin_claim_ledger (
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  claim_day TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (account_id, claim_day)
+);
+CREATE INDEX IF NOT EXISTS checkin_claim_ledger_created_at ON checkin_claim_ledger(created_at DESC);`},
 }
 
 const schemaMigrationsDDL = `
