@@ -35,6 +35,10 @@ export function isCodeArtsProvider(provider?: string) {
   return String(provider || '').toLowerCase() === 'codearts'
 }
 
+export function isDoubaoworkProvider(provider?: string) {
+  return String(provider || '').toLowerCase() === 'doubaowork'
+}
+
 export function isMiniMaxCodeProvider(provider?: string) {
   return String(provider || '').toLowerCase() === 'minimaxcode'
 }
@@ -57,6 +61,7 @@ export function accountProviderFamilyLabel(
   if (isQwenworkProvider(providerID)) return 'QwenWork'
   if (isKimiProvider(providerID)) return 'Kimi Code'
   if (isCodeArtsProvider(providerID)) return 'CodeArts'
+  if (isDoubaoworkProvider(providerID)) return 'Doubao Work'
   if (isMiniMaxCodeProvider(providerID)) return 'MiniMax Code'
   if (isMetaProvider(providerID)) return 'Muse (Meta)'
   if (isQoderProvider(providerID)) return 'Qoder'
@@ -93,6 +98,9 @@ export function accountProviderLabel(
   }
   if (isCodeArtsProvider(providerID)) {
     return t('accountTypeCodeArtsCN')
+  }
+  if (isDoubaoworkProvider(providerID)) {
+    return t('accountTypeDoubaoworkCN')
   }
   if (isMiniMaxCodeProvider(providerID)) {
     return regionID === 'global' ? t('accountTypeMiniMaxCodeGlobal') : t('accountTypeMiniMaxCodeCN')

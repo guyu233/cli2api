@@ -62,6 +62,7 @@ Use **Accounts** to add an account with its supported login method:
 | CodeArts | CN | Browser OAuth, `codearts-oauth-v1` | Experimental |
 | Kiro | US East / EU Central | Browser OAuth, API key, `kiro-oauth-v1` | Experimental |
 | Muse (Meta) | Global | Browser OAuth, API key, `meta-oauth-v1` / `meta-key-v1` | Experimental |
+| Doubao Work | CN | Browser login or Cookie, `doubaowork-cookie-v1` | Experimental |
 | MiniMax Code | Global / CN | Browser OAuth, `minimaxcode-oauth-v1` | Experimental |
 
 The Status column matches the console's account picker: Qoder, WorkBuddy, and
@@ -79,12 +80,14 @@ with a PAT. Every other provider uses a Go in-process adapter. All durable
 credentials stay in SQLite.
 
 Check-in is declared per provider and per region. Providers that declare it
-today are WorkBuddy, QwenWork, Qoder, Trae, MiniMax Code, CodeArts, and Doubao
-Work, and each offers a manual check-in on the account card. Automatic check-in
-is opt-in per account and disabled by default; the default time for each
-provider is set under **System → Automatic check-in**, and an account can
-override it. WorkBuddy also has a per-account token keepalive, disabled by
-default. Enable either only if you want those automatic account operations.
+today are WorkBuddy, QwenWork, Qoder, Trae, MiniMax Code, and CodeArts, and each
+offers a manual check-in on the account card. Automatic check-in is opt-in per
+account and disabled by default; the default time for each provider is set under
+**System → Automatic check-in**, and an account can override it. WorkBuddy also
+has a per-account token keepalive, disabled by default. Doubao Work is restored
+without check-in: its quota is read-only and no claim endpoint is called. Its
+nightly session keepalive persists refreshed cookies, but cannot extend a
+non-sliding `sessionid`; an expired Doubao session still needs a re-login.
 
 ## 3. Connect a client
 
@@ -169,6 +172,8 @@ console; environment variables cannot replace it.
 | `UPDATE_GITHUB_REPO` | `caigee-cmd/cli2api` | Release repository (`owner/repo`) whose GitHub releases the console follows; set it to `caigee-cmd/cli2api` to follow upstream instead |
 | `UPDATE_AGENT_URL` | empty | Docker Desktop host updater URL, written by the installer |
 | `UPDATE_AGENT_TOKEN` | empty | Docker Desktop updater token, written by the installer |
+| `DOUBAOWORK_LOGIN_SCRIPT` | `worker/src/doubaowork-login.mjs` | Short-lived Playwright helper used by the Doubao Work browser login; set an absolute path when the gateway runs outside the repo root |
+| `DOUBAOWORK_CHROME` | auto-detected | Chrome/Edge executable for the Doubao Work browser login; `playwright-core` never downloads a browser |
 | `CLI2API_UPDATER_SOCKET_DIR` | platform-specific | Host directory mounted read-only for the Linux updater socket |
 
 These are process settings; Compose passes only variables declared in its

@@ -419,6 +419,32 @@ var Meta = ProviderDescriptor{
 	DefaultRegion: "global",
 }
 
+// DoubaoWork is the Doubao Work (豆包工作) subscription, served by the
+// doubao.com web/desktop chat protocol. Auth is a web-session Cookie: the
+// console can obtain it through a short-lived Playwright login (persistent
+// profile) or the operator can paste it. Chat stays in-process HTTP; the
+// browser is only used during login and never per request.
+var DoubaoWork = ProviderDescriptor{
+	ID:                "doubaowork",
+	Label:             "Doubao Work",
+	Runtime:           RuntimeInProcess,
+	AuthTypes:         []AuthType{AuthOAuth, AuthPAT},
+	CredentialFormats: []string{"doubaowork-cookie-v1"},
+	Capabilities: ProviderCapabilities{
+		Chat: true, Stream: true, Tools: true, Images: false, Reasoning: true,
+		ModelCatalog: true, Usage: true, Login: true, BrowserLogin: true,
+		PATLogin: true, ImportExport: true,
+	},
+	Regions: []RegionDescriptor{
+		{
+			ID: "cn", Label: "CN", ChatBase: "https://www.doubao.com",
+			BillingBase: "https://www.doubao.com", AuthBase: "https://www.doubao.com",
+			DefaultDomain: "doubao.com",
+		},
+	},
+	DefaultRegion: "cn",
+}
+
 // MiniMaxCode is the MiniMax Code subscription product, reached through its
 // OAuth device flow and Anthropic-compatible agent gateway. It is distinct
 // from the MiniMax Open Platform API-key gateway.
@@ -467,6 +493,7 @@ var registry = map[string]ProviderDescriptor{
 	CodeArts.ID:    CodeArts,
 	Kiro.ID:        Kiro,
 	Meta.ID:        Meta,
+	DoubaoWork.ID:  DoubaoWork,
 	MiniMaxCode.ID: MiniMaxCode,
 }
 
@@ -480,7 +507,7 @@ func Get(id string) (ProviderDescriptor, bool) {
 }
 
 func List() []ProviderDescriptor {
-	return []ProviderDescriptor{Qoder, WorkBuddy, Trae, Devin, Command, Codex, Zhipu, QwenWork, Kimi, CodeArts, Kiro, Meta, MiniMaxCode}
+	return []ProviderDescriptor{Qoder, WorkBuddy, Trae, Devin, Command, Codex, Zhipu, QwenWork, Kimi, CodeArts, Kiro, Meta, DoubaoWork, MiniMaxCode}
 }
 
 // Resolve validates a provider/region pair. Empty values fall back to the

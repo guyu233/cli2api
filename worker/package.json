@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "playwright-core": "^1.65.1",
     "undici": "6.21.2"
   },
   "type": "module",

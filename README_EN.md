@@ -60,7 +60,7 @@ Model IDs come from **Access** or `/v1/models`. Routing is automatic and prefers
 <img src="./docs/assets/readme/request-en.svg" width="100%" alt="A client sends the request to local port 3010, the gateway picks an account you own, then calls the upstream">
 </p>
 
-Stable support covers **Qoder (Global / CN)**, **WorkBuddy (Global / CN)**, **Trae CN Work**, and **Huawei Cloud CodeArts (码道)**. Every other provider is experimental and not a production promise: Devin, Command Code, Codex, Zhipu GLM, QwenWork (Global / CN), Kimi Code (CN), Kiro, Muse (Meta), and MiniMax Code (Global / CN).
+Stable support covers **Qoder (Global / CN)**, **WorkBuddy (Global / CN)**, **Trae CN Work**, and **Huawei Cloud CodeArts (码道)**. Every other provider is experimental and not a production promise: Devin, Command Code, Codex, Zhipu GLM, QwenWork (Global / CN), Kimi Code (CN), Kiro, Muse (Meta), Doubao Work (豆包工作), and MiniMax Code (Global / CN).
 
 The Go gateway handles authentication, routing, and request logging. PAT-backed Qoder accounts talk to the upstream in-process. Qoder accounts that still use the legacy CLI credential keep one Node process and HOME each. Other providers use in-process adapters, so no full CLI starts per request.
 
