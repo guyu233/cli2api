@@ -6,12 +6,15 @@ import {
   codexPlanLabel,
   formatQuotaAmount,
   formatQuotaExact,
+  formatQuotaUnit,
   quotaExpiryLabel,
   quotaResetLabel,
   quotaTone,
   quotaUsedRatio,
   quotaWindowAmount,
+  quotaWindowIsPercent,
   quotaWindowLabel,
+  quotaWindowUsed,
   quotaWindows,
 } from '@/lib/account'
 
@@ -36,10 +39,10 @@ type Props = {
  */
 function extraQuotaLines(quota: AccountQuota, remainingLabel: string, addOnLabel: string, resourcePackageLabel: string, t: Translate, provider?: string) {
   const addOn = quota.has_add_on && quota.add_on_available !== false
-    ? `${addOnLabel} ${formatQuotaAmount(quota.add_on_used)} / ${formatQuotaAmount(quota.add_on_total)} ${quota.add_on_unit || 'credits'}`
+    ? `${addOnLabel} ${formatQuotaAmount(quota.add_on_used)} / ${formatQuotaAmount(quota.add_on_total)} ${formatQuotaUnit(quota.add_on_unit) || 'credits'}`
     : ''
   const resourcePackage = quota.has_resource_package && quota.resource_package_available !== false
-    ? `${resourcePackageLabel} ${remainingLabel} ${formatQuotaAmount(quota.resource_package_remaining)} ${quota.resource_package_unit || 'credits'}`
+    ? `${resourcePackageLabel} ${remainingLabel} ${formatQuotaAmount(quota.resource_package_remaining)} ${formatQuotaUnit(quota.resource_package_unit) || 'credits'}`
     : ''
   // Package-expiry is a WorkBuddy-only surface; never render it for other
   // providers even if a stale snapshot happens to carry the fields.
@@ -67,21 +70,26 @@ function WindowMeter({
   const tone = quotaTone(window)
   const color = tone === 'danger' ? 'danger' : tone === 'warn' ? 'warning' : 'success'
   const amountUnit = quotaWindowAmount(window)
+  const usedOnly = quotaWindowUsed(window)
+  const isPercent = quotaWindowIsPercent(window)
   const withAmount = (value: number | undefined, unit: string) =>
     `${formatQuotaExact(value)}${unit ? ` ${unit}` : ''}`
   const usedPercent = t('quotaUsedPercent', { n: percent })
-  // Only a window with a real balance gets a meter: a provider that reports
-  // nothing but its plan name must not render as an empty 0% bar.
-  const hasReading = amountUnit !== null || window.percentage != null || window.remaining != null
+  // A window only gets a meter when it carries a number: a balance (used/total),
+  // a spent count with no cap, or a real percentage limit. A provider that
+  // reports nothing but its plan row stays a label instead of a 0% bar.
+  const hasReading = amountUnit !== null || usedOnly !== null || isPercent
 
   const headline = amountUnit !== null
     ? `${remainingLabel} ${withAmount(window.remaining, amountUnit)} · ${usedPercent}`
-    : hasReading
-      ? `${remainingLabel} ${Math.round(window.remaining ?? 100 - percent)}%`
-      : ''
+    : usedOnly !== null
+      ? `${usedLabel} ${withAmount(usedOnly.used, usedOnly.unit)}`
+      : isPercent
+        ? `${remainingLabel} ${Math.round(window.remaining ?? 100 - percent)}%`
+        : ''
   const detail = amountUnit !== null
     ? `${usedLabel} ${withAmount(window.used, amountUnit)} / ${withAmount(window.total, amountUnit)}`
-    : hasReading
+    : isPercent
       ? `${usedLabel} ${usedPercent}`
       : ''
   const valueLabel = [label, headline, detail, reset].filter(Boolean).join(' · ')
@@ -133,9 +141,9 @@ function WindowMeter({
 // Devin daily / weekly / monthly windows each occupy a full-width row with
 // a titled bar, used percent, and reset copy.
 export function QuotaMeter({ quota, t, label, usedLabel, remainingLabel, addOnLabel, resourcePackageLabel, exceededLabel, provider }: Props) {
-  const unit = quota.unit || 'credits'
-  const used = `${formatQuotaAmount(quota.used)} / ${formatQuotaAmount(quota.total)}`
-  const remaining = `${formatQuotaAmount(quota.remaining)}`
+  const unit = formatQuotaUnit(quota.unit) || 'credits'
+  const used = `${formatQuotaExact(quota.used)} / ${formatQuotaExact(quota.total)}`
+  const remaining = `${formatQuotaExact(quota.remaining)}`
   const extra = extraQuotaLines(quota, remainingLabel, addOnLabel, resourcePackageLabel, t, provider)
   const windows = quotaWindows(quota)
   const plan = provider === 'codex' || provider === 'kiro' ? codexPlanLabel(quota.plan) : ''
@@ -168,6 +176,12 @@ export function QuotaMeter({ quota, t, label, usedLabel, remainingLabel, addOnLa
         ))}
       </div>
     )
+  }
+
+  // A provider that reports neither a balance nor a percentage has nothing to
+  // meter; rendering an empty 0/0 bar would read as a real, spent account.
+  if ((quota.total ?? 0) <= 0 && (quota.used ?? 0) <= 0 && (quota.remaining ?? 0) <= 0) {
+    return null
   }
 
   return (
