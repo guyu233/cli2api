@@ -21,3 +21,9 @@ web/
 deploy/docker-compose.override.yml
 .zcode/
 .learnings/
+
+# Runtime SQLite snapshots may contain account credentials; never track them.
+/qoder.db
+/qoder.db-*
+/qoder.snapshot.db
+/qoder.snapshot.db-*
