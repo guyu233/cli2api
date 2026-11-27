@@ -3,6 +3,34 @@
 Published user-facing notes for GitHub Releases and the console update page.
 Write upcoming notes as bilingual files in `changelog/unreleased/`.
 
+## 0.7.52 - 2026-11-27
+
+### English
+
+- Trae renews a rejected access token once per request and retries on the same account, and a transient renewal failure no longer marks the account "needs login".
+- A successful credential renewal (Trae, WorkBuddy) clears a stale "needs login" status, so the card stops contradicting the live routing state.
+- WorkBuddy session keepalive covers every enabled account, not only check-in opt-in accounts.
+- Account cards resolve status in one documented order: disabled, recovering, needs login, quota exhausted, cooling, starting, ready, unavailable. A probe failure only reads as "needs login" when it was classified as an auth failure.
+- Trae and WorkBuddy now renew a token once per account instead of once per request: concurrent requests wait on the same per-account lock, and a 401 on an old token reuses the token another request already stored. Both providers rotate the refresh token, so this prevents a second exchange from invalidating the live session.
+- An imported token with no known expiry is no longer renewed on every request; the 401 path renews it once when upstream actually rejects it.
+- Trae joins the nightly session keepalive. WorkBuddy keepalive skips a token that a normal request already renewed within six hours, so the sweep no longer rotates a fresh token twice in one day.
+- A bulk quota refresh that fails partway now opens a dialog listing every failed account, with its provider, status badge and the upstream reason, and offers copying the whole list.
+- The toast names the first failed account and its reason instead of dumping one raw upstream error, and account cards clean HTML error pages and internal account ids out of the displayed reason.
+- Removed the experimental Doubao Work (`doubaowork`) provider and its pasted-Cookie login path. Existing Doubao Work accounts are deleted on upgrade.
+
+### 中文
+
+- Trae 在请求遇到 401 时会先续期一次并在同一账号上重试；续期过程中的网络/上游故障不再把账号标成「需要登录」。
+- Trae、WorkBuddy 续期成功后清除遗留的「需要登录」状态，卡片不再与实时调度状态互相矛盾。
+- WorkBuddy 保活覆盖所有启用账号，不再只保开启自动签到的账号。
+- 账号卡片按统一顺序判定状态：已停用、恢复中、需要登录、额度用尽、冷却中、启动中、就绪、不可用；探测失败只有被判定为鉴权失败时才显示「需要登录」。
+- Trae、WorkBuddy 的续期改为按账号串行：同一账号的并发请求共用一次换取，遇到 401 时若别的请求已写入新 token 就直接复用。两者都会轮换 refresh token，这样可避免第二次换取把仍在使用的会话顶掉。
+- 导入的凭据在过期时间未知时不再每个请求都续期，改由上游真正返回 401 时续期一次。
+- Trae 接入每晚的会话保活；WorkBuddy 保活会跳过普通请求在 6 小时内刚续过的 token，避免同一天把新 token 再轮换一次。
+- 批量刷新额度部分失败时会弹出对话框，逐个列出失败账号、所属平台、状态徽标和上游返回的原因，并支持一键复制全部。
+- 提示条改为「账号名：原因」的形式，不再直接抛出一段上游原始错误；账号卡片也会清洗展示的原因里的 HTML 错误页和内部账号 ID。
+- 移除实验性的豆包工作（`doubaowork`）供应商及其粘贴 Cookie 登录入口；升级时会删除已有的豆包工作账号。
+
 ## 0.7.50 - 2026-11-27
 
 ### English
