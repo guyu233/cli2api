@@ -146,6 +146,25 @@ export function formatQuotaAmount(value: number | undefined) {
   return String(Math.round(value * 100) / 100)
 }
 
+// Window meters name their own balance, so they keep the exact figure instead
+// of the abbreviated 2.5k form: a percentage alone does not say how much quota
+// is left.
+export function formatQuotaExact(value: number | undefined) {
+  if (value == null || !Number.isFinite(value)) return '—'
+  return String(Math.round(value * 100) / 100)
+}
+
+// A window metered in percent (Codex, Devin, Kimi, Zhipu) has no credit
+// balance to name; anything else is a real amount with a unit. An empty
+// string means "a real amount whose provider names no unit".
+export function quotaWindowAmount(window: AccountQuotaWindow): string | null {
+  const total = window.total ?? 0
+  const unit = (window.unit ?? '').trim()
+  if (!Number.isFinite(total) || total <= 0) return null
+  if (unit.toLowerCase() === 'percent' || unit === '%') return null
+  return unit
+}
+
 export function quotaUsedRatio(quota: AccountQuota) {
   const percentage = quota.percentage ?? 0
   if (!Number.isFinite(percentage)) return 0
