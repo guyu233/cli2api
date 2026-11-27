@@ -12,23 +12,24 @@ import (
 // Qoder: the cosy-version header, the bearer payload's cosyVersion, the chat
 // body's business.version and the OpenAPI User-Agent all derive from it.
 // 1.1.81 introduced catalog-v7 and model_key on the business block; the
-// current official CLI is 1.1.96, whose COSY signing algorithm, headers and
+// current official CLI is 1.1.99, whose COSY signing algorithm, headers and
 // business endpoints are unchanged from 1.1.89. Keep this aligned with the
 // published CLI rather than the older protocol floor. The desktop check-in
 // version stays separate because campaign endpoints use their own identity.
-const CosyVersion = "1.1.96"
+// The legacy worker CLI pin stays at 1.1.32 until its compat hooks are
+// rewritten; only this in-process COSY client follows the released CLI.
+const CosyVersion = "1.1.99"
 
 // DesktopCosyVersionCN / DesktopCosyVersionGlobal are the Cosy-Version values
 // the official desktop apps send on campaign / check-in requests, per edition.
-// They track the published desktop releases rather than the CLI: Qoder CN is
-// 0.5.18 (2026-11-24, changelog.qoder.cn/app) and the international app is
-// 0.5.3 (2026-11-03, qoder.com/zh/changelog). Distinct from CosyVersion (CLI /
-// reasoning). Campaign endpoints only care about the client type and identity;
-// the value is attribution, not a gate, so keeping it on the current app
-// release is safe.
+// They track the published desktop releases rather than the CLI: both Qoder
+// editions are 0.5.20 (2026-11-25, changelog.qoder.cn/app and qoder.com/changelog).
+// Distinct from CosyVersion (CLI / reasoning). Campaign endpoints only care
+// about the client type and identity; the value is attribution, not a gate, so
+// keeping it on the current app release is safe.
 const (
-	DesktopCosyVersionCN     = "0.5.18"
-	DesktopCosyVersionGlobal = "0.5.3"
+	DesktopCosyVersionCN     = "0.5.20"
+	DesktopCosyVersionGlobal = "0.5.20"
 )
 
 // DesktopCosyVersion returns the desktop check-in version for an edition.

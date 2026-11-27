@@ -18,7 +18,7 @@ func TestIdeVersionCodeIsInCurrentModelCohort(t *testing.T) {
 			t.Fatalf("IdeVersionCode=%q must be numeric", IdeVersionCode)
 		}
 	}
-	const minModelCohort = "20261117" // v3.4.21 release build; bump with IdeVersionCode when the client line moves
+	const minModelCohort = "20261124" // v3.4.25 release build; bump with IdeVersionCode when the client line moves
 	if IdeVersionCode < minModelCohort {
 		t.Fatalf("IdeVersionCode=%q is below the %s model cohort; the catalog would collapse to the legacy six", IdeVersionCode, minModelCohort)
 	}

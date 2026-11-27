@@ -36,7 +36,7 @@ const (
 // from the official CLI on the wire.
 const (
 	Platform      = "kimi_code_cli"
-	ClientVersion = "2.7.3"
+	ClientVersion = "2.8.1"
 	UserAgent     = "kimi-code-cli/" + ClientVersion
 )
 

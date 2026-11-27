@@ -22,7 +22,7 @@ const (
 	ConsoleHost = "https://www.trae.cn"
 
 	// Login uses the IDE product markers (PKCE authorization-code flow):
-	// client_id below, auth_from=trae, x_app_version=3.4.21.
+	// client_id below, auth_from=trae, x_app_version=3.4.25.
 	ClientID = "ono9krqynydwx5"
 	AuthFrom = "trae"
 	AppID    = "6eefa01c-1036-4c7e-9ca5-d891f63bfcd8"
@@ -34,12 +34,14 @@ const (
 	// 4001, while 20261117 returned 65 / 21). The version string itself is not
 	// gated (3.3.62 and 9.9.9 return the same catalog as the current 3.4.x for
 	// one code).
-	// Keep both aligned with the newest *published* Trae CN build: 3.4.21
-	// shipped 2026-11-17 (trae.cn/changelog), so its build date is 20261117.
-	// Do not copy a larger gray-channel version such as 3.4.24: it is not in
+	// Keep both aligned with the newest *published* Trae CN build: 3.4.25
+	// shipped 2026-11-24 (trae.cn/changelog), so its build date is 20261124.
+	// Do not copy a larger gray-channel version such as 3.4.26: it is not in
 	// the public release line, so it says nothing true about the client.
-	IdeVersion     = "3.4.21"
-	IdeVersionCode = "20261117"
+	// A live catalog probe with a current account returned an identical
+	// catalog for 20261117/20261124, so this stays in the current cohort.
+	IdeVersion     = "3.4.25"
+	IdeVersionCode = "20261124"
 	DeviceBrand    = "83DG"
 	OSVersion      = "Windows 11 Pro"
 	// Function is the fallback scene for a model that is in no fetched scene

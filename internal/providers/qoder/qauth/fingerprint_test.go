@@ -23,10 +23,10 @@ func TestUserAgentIsBun(t *testing.T) {
 	if openAPIUserAgentVersion != CosyVersion {
 		t.Fatal("OpenAPI UA version must follow CosyVersion")
 	}
-	if CosyVersion != "1.1.96" {
-		t.Fatalf("CosyVersion=%q want 1.1.96", CosyVersion)
+	if CosyVersion != "1.1.99" {
+		t.Fatalf("CosyVersion=%q want 1.1.99", CosyVersion)
 	}
-	if DesktopCosyVersion(CN) != "0.5.18" || DesktopCosyVersion(Global) != "0.5.3" {
+	if DesktopCosyVersion(CN) != "0.5.20" || DesktopCosyVersion(Global) != "0.5.20" {
 		t.Fatalf("DesktopCosyVersion CN=%q global=%q", DesktopCosyVersion(CN), DesktopCosyVersion(Global))
 	}
 }

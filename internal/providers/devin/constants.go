@@ -18,9 +18,9 @@ const (
 
 	ClientProductLabel = "devin-cli"
 	ClientName         = "chisel"
-	// ClientVersion tracks the stable Devin CLI release (v3000.14.30821,
-	// 2026-11-17 per docs.devin.ai/cli/changelog/stable).
-	ClientVersion = "3000.14.30821"
+	// ClientVersion tracks the stable Devin CLI release (v3000.15.14,
+	// 2026-11-25 per docs.devin.ai/cli/changelog/stable).
+	ClientVersion = "3000.15.14"
 
 	FingerprintHexLen = 732
 	DefaultMaxTokens  = 128000

@@ -34,10 +34,10 @@ const (
 	KeyPrefix = "user_"
 
 	// PinnedCLIVersion is sent as x-command-code-version on /alpha/generate.
-	// Verified against the published `command-code` npm package (1.93.3 as of
+	// Verified against the published `command-code` npm package (1.93.4 as of
 	// 2026-11-25). Override at runtime with CMD_CLI_VERSION when the gateway
 	// moves ahead of this build.
-	PinnedCLIVersion = "1.93.3"
+	PinnedCLIVersion = "1.93.4"
 
 	// CLIEnvironment is the x-cli-environment header value.
 	CLIEnvironment = "production"

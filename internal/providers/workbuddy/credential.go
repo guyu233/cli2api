@@ -25,11 +25,12 @@ const (
 	// edition token, then the bundled CLI. Origin/Referer stay region-specific
 	// and must never mix CN with Global. All client versions live here.
 	// CLIVersion tracks the published @tencent-ai/codebuddy-code package
-	// (2.186.0, 2026-11-24). The desktop app version, not the bundled CLI
-	// version, is the UA/version segment; live A/B on CN 2026-11-25 showed
+	// (2.187.0, 2026-11-25). The desktop app version, not the bundled CLI
+	// version, is the UA/version segment; a live A/B on CN 2026-11-25 showed
 	// CLI 2.176.0 and 2.186.0 return the same 57-model catalog and both stream
-	// chat, so the CLI segment follows the package rather than a frozen bundle.
-	CLIVersion = "2.186.0"
+	// chat, so the CLI segment follows the published package rather than a
+	// frozen desktop bundle.
+	CLIVersion = "2.187.0"
 	UserAgent  = "WorkBuddy/" + DesktopVersionCN + " WorkBuddy/" + DesktopVersionCN + " CLI/" + DesktopCLIVersionCN
 
 	// OpenAI Node SDK fingerprint the official CLI attaches to chat.
@@ -50,9 +51,9 @@ const (
 	// build. The current official builds are CN 5.11.3 and Global 5.11.4
 	// (both 2026-11); their CLI segment follows the published CLI package.
 	DesktopVersionGlobal    = "5.11.4"
-	DesktopCLIVersionGlobal = "2.186.0"
+	DesktopCLIVersionGlobal = "2.187.0"
 	DesktopVersionCN        = "5.11.3"
-	DesktopCLIVersionCN     = "2.186.0"
+	DesktopCLIVersionCN     = "2.187.0"
 	DesktopUserAgentGlobal  = "WorkBuddy/" + DesktopVersionGlobal + " workbuddy-ai/" + DesktopVersionGlobal + " CLI/" + DesktopCLIVersionGlobal
 	DesktopUserAgentCN      = UserAgent
 	// DaemonUserAgentGlobal is the background-service UA: the global edition's
@@ -62,7 +63,7 @@ const (
 	// IDEVersion is the CodeBuddy IDE plugin release. It is not on the wire
 	// today; it is kept aligned with the bundled CLI identity so no stale
 	// version number is left in the package.
-	IDEVersion = "2.186.0"
+	IDEVersion = "2.187.0"
 
 	// DesktopVersion/DesktopUserAgent are for /v3/config only (Global). Live
 	// A/B showed the same Global account returns the IDE dropdown (incl.
