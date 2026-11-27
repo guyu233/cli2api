@@ -26,7 +26,10 @@ func (c *Client) ChatStream(ctx context.Context, accountID string, req translate
 	reader, err := preflightWithTimeout(upstream)
 	if err != nil {
 		if providerErr, ok := err.(*providers.Error); ok && providerErr.Kind == accounts.KindModelNotAvailable {
-			c.markModelUnusable(accountID, req.Model)
+			// Availability is learned per catalog model, so record the canonical
+			// name instead of the client's spelling (which may carry a
+			// codearts/ prefix) or the filter never matches the catalog row.
+			c.markModelUnusable(accountID, c.displayModel(accountID, req.Model))
 		}
 		return nil, providers.ResolvedChat{}, err
 	}
@@ -195,7 +198,12 @@ func (c *Client) sendChat(ctx context.Context, accountID string, credential Cred
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("x-auth-token", credential.SecurityToken)
+	// STS credentials authenticate with x-auth-token (the security token).
+	// A long-lived AK/SK pair has no such token and relies on the SDK-HMAC
+	// signature alone (the same combination the CodeArts CLI uses with AK/SK).
+	if strings.TrimSpace(credential.SecurityToken) != "" {
+		req.Header.Set("x-auth-token", credential.SecurityToken)
+	}
 	req.Header.Set("x-snap-traceid", randomHex(16))
 	req.Header.Set("X-Language", Language)
 	req.Header.Set("app-id", AppID)

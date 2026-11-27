@@ -30,6 +30,7 @@ const SUBSCRIPTION_IDS = new Set([
   'workbuddy-global',
   'workbuddy-cn',
   'trae-cn',
+  'codearts-cn-north-4',
 ])
 
 const SUBSCRIPTION_ORDER = [
@@ -38,6 +39,7 @@ const SUBSCRIPTION_ORDER = [
   'workbuddy-global',
   'workbuddy-cn',
   'trae-cn',
+  'codearts-cn-north-4',
 ]
 
 function sortByKnownOrder(tiles: ProviderTileOption[], order: string[]) {

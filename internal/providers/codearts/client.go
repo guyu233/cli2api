@@ -189,7 +189,7 @@ func (c *Client) credential(ctx context.Context, accountID string) (Credential, 
 		return credential, &providers.Error{
 			Kind:    accounts.KindAuth,
 			Status:  http.StatusUnauthorized,
-			Message: "codearts account has no STS credential; sign in again",
+			Message: "codearts account has no usable AK/SK or STS credential; import a key pair or sign in again",
 		}
 	}
 	if !credential.NeedsRefresh(c.now()) {

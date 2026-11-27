@@ -2,7 +2,7 @@
 
 CLI2API keeps the Qoder execution path stable while adding provider-specific
 adapters behind the shared account, routing, and protocol contracts. Qoder,
-WorkBuddy, and Trae are the stable providers; every other registered provider is
+WorkBuddy, Trae, and Huawei Cloud CodeArts are the stable providers; every other registered provider is
 experimental, and the current set lives in `internal/providers/registry.go`
 rather than in this document. Read [AGENTS.md](AGENTS.md) for hard rules, [docs/ARCHITECTURE_SUMMARY.md](docs/ARCHITECTURE_SUMMARY.md) for the public backend map, and [docs/REFACTORING.md](docs/REFACTORING.md) for accepted package boundaries. Preserve existing uncommitted work;
 before feature work, fetch and merge the latest `origin/main` into your branch.

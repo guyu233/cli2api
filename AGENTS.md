@@ -1,6 +1,6 @@
 # AGENTS
 
-Go + Node gateway for personal accounts, with OpenAI / Anthropic-compatible endpoints. Stable providers are Qoder, WorkBuddy, and Trae CN Work; every other registered provider is experimental. The provider set is whatever `internal/providers/registry.go` registers, so do not treat any list in these docs as exhaustive.
+Go + Node gateway for personal accounts, with OpenAI / Anthropic-compatible endpoints. Stable providers are Qoder, WorkBuddy, Trae CN Work, and Huawei Cloud CodeArts (码道); every other registered provider is experimental. The provider set is whatever `internal/providers/registry.go` registers, so do not treat any list in these docs as exhaustive.
 
 ## Docs
 
