@@ -21,3 +21,11 @@ web/
 deploy/docker-compose.override.yml
 .zcode/
 .learnings/
+
+# Runtime SQLite databases contain account credentials and request logs.
+# Keep them on the host (QODER_DATA_DIR), never in the repository.
+/qoder.db
+/qoder.db-wal
+/qoder.db-shm
+/qoder.db-journal
+/qoder.snapshot.db
