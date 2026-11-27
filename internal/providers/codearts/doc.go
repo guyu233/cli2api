@@ -21,6 +21,14 @@
 // surfaces as an auth failure and asks for a new login; a successful rotation
 // is persisted before the request continues.
 //
+// A long-lived IAM AK/SK pair is also accepted. The official CodeArts CLI
+// supports it via CODEARTS_CLI_AK / CODEARTS_CLI_SK (portal:
+// codearts.huaweicloud.com/portal/settings/cli-auth); credentials.csv exports
+// the same pair as AccessKeyId / SecretAccessKey. Such a credential has no STS
+// security token and no refresh token. It is ready immediately, never rotated,
+// signs requests with SDK-HMAC-SHA256 like the STS trio, and omits the
+// x-auth-token / X-Security-Token headers (which only carry an STS token).
+//
 // Import is supported; export is not. A credential contains the STS keys and
 // the refresh token, so handing it back out of the console would hand out the
 // account. The descriptor advertises ImportExport because that capability

@@ -35,24 +35,27 @@ type Credential struct {
 // STS trio may be nested under credentials/credential, security_token may be
 // cloud_dragon_token, and expiry may be expiration/expires_at.
 type wireCredential struct {
-	Format          string            `json:"format"`
-	AccessKeyID     string            `json:"access_key_id"`
-	SecretAccessKey string            `json:"secret_access_key"`
-	SecurityToken   string            `json:"security_token"`
-	CloudDragonTok  string            `json:"cloud_dragon_token"`
-	ExpiresAt       string            `json:"expires_at"`
-	Expiration      string            `json:"expiration"`
-	DomainID        string            `json:"domain_id"`
-	AccountID       string            `json:"account_id"`
-	UserID          string            `json:"user_id"`
-	UserName        string            `json:"user_name"`
-	RefreshToken    string            `json:"refresh_token"`
-	CodeVerifier    string            `json:"code_verifier"`
-	ClientID        string            `json:"client_id"`
-	DPoPPrivateKey  map[string]string `json:"dpop_private_key"`
-	Plan            string            `json:"plan"`
-	BaseURL         string            `json:"base_url"`
-	Credentials     struct {
+	Format          string `json:"format"`
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+	// Huawei Cloud's exported credentials.csv uses these camel-case keys.
+	AccessKeyIDCamel     string            `json:"AccessKeyId"`
+	SecretAccessKeyCamel string            `json:"SecretAccessKey"`
+	SecurityToken        string            `json:"security_token"`
+	CloudDragonTok       string            `json:"cloud_dragon_token"`
+	ExpiresAt            string            `json:"expires_at"`
+	Expiration           string            `json:"expiration"`
+	DomainID             string            `json:"domain_id"`
+	AccountID            string            `json:"account_id"`
+	UserID               string            `json:"user_id"`
+	UserName             string            `json:"user_name"`
+	RefreshToken         string            `json:"refresh_token"`
+	CodeVerifier         string            `json:"code_verifier"`
+	ClientID             string            `json:"client_id"`
+	DPoPPrivateKey       map[string]string `json:"dpop_private_key"`
+	Plan                 string            `json:"plan"`
+	BaseURL              string            `json:"base_url"`
+	Credentials          struct {
 		AccessKeyID     string `json:"access_key_id"`
 		SecretAccessKey string `json:"secret_access_key"`
 		SecurityToken   string `json:"security_token"`
@@ -103,6 +106,12 @@ func DecodeCredential(payload []byte) (Credential, error) {
 		BaseURL:         normalizeBase(wire.BaseURL),
 	}
 	if credential.AccessKeyID == "" {
+		credential.AccessKeyID = strings.TrimSpace(wire.AccessKeyIDCamel)
+	}
+	if credential.SecretAccessKey == "" {
+		credential.SecretAccessKey = strings.TrimSpace(wire.SecretAccessKeyCamel)
+	}
+	if credential.AccessKeyID == "" {
 		credential.AccessKeyID = strings.TrimSpace(wire.Credentials.AccessKeyID)
 	}
 	if credential.SecretAccessKey == "" {
@@ -149,12 +158,22 @@ func (c Credential) Encode() ([]byte, error) {
 	return json.Marshal(c)
 }
 
+// StaticAKSK reports whether the credential is a long-lived IAM access key
+// pair rather than the short-lived STS trio minted by the OAuth login. The
+// official CodeArts CLI also accepts such a pair via CODEARTS_CLI_AK/SK; it has
+// no STS token and no refresh token, and never needs rotation.
+func (c Credential) StaticAKSK() bool {
+	return c.Valid() && !c.CanRefresh() && strings.TrimSpace(c.SecurityToken) == ""
+}
+
 // Ready reports whether the credential can authenticate a chat request now.
 // A credential with only a refresh token is not ready until refresh succeeds.
+// A long-lived AK/SK pair is ready on its own (no STS token needed).
 func (c Credential) Ready() bool {
-	return strings.TrimSpace(c.AccessKeyID) != "" &&
-		strings.TrimSpace(c.SecretAccessKey) != "" &&
-		strings.TrimSpace(c.SecurityToken) != ""
+	if !c.Valid() {
+		return false
+	}
+	return strings.TrimSpace(c.SecurityToken) != "" || c.StaticAKSK()
 }
 
 // Valid reports whether the signing material exists. Unlike Ready it does not
@@ -172,6 +191,10 @@ func (c Credential) CanRefresh() bool {
 // An empty or unparseable expiry is treated as stale (not fresh), because a bad
 // timestamp would otherwise hide an expired credential forever.
 func (c Credential) NeedsRefresh(now time.Time) bool {
+	// A long-lived AK/SK pair has no STS expiry and nothing to rotate.
+	if c.StaticAKSK() {
+		return false
+	}
 	if !c.Ready() {
 		return c.CanRefresh()
 	}
@@ -214,7 +237,7 @@ func ValidateCredential(payload []byte) error {
 		return err
 	}
 	if !credential.Ready() && !credential.CanRefresh() {
-		return errors.New("codearts credential requires STS access keys or a refresh token")
+		return errors.New("codearts credential requires a long-lived AK/SK pair, STS access keys, or a refresh token")
 	}
 	if credential.BaseURL != "" {
 		if err := validateBaseURL(credential.BaseURL); err != nil {
