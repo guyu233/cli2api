@@ -5,10 +5,12 @@ import type { AccountQuota, AccountQuotaWindow } from '@/api/types'
 import {
   codexPlanLabel,
   formatQuotaAmount,
+  formatQuotaExact,
   quotaExpiryLabel,
   quotaResetLabel,
   quotaTone,
   quotaUsedRatio,
+  quotaWindowAmount,
   quotaWindowLabel,
   quotaWindows,
 } from '@/lib/account'
@@ -48,20 +50,45 @@ function extraQuotaLines(quota: AccountQuota, remainingLabel: string, addOnLabel
 function WindowMeter({
   window,
   t,
+  usedLabel,
+  remainingLabel,
   extra,
 }: {
   window: AccountQuotaWindow
   t: Translate
+  usedLabel: string
+  remainingLabel: string
   extra?: string[]
 }) {
   const percent = Math.round(window.percentage ?? 0)
   const label = quotaWindowLabel(window, t)
-  const usedText = t('quotaUsedPercent', { n: percent })
   const reset = quotaResetLabel(window.reset_at, t)
-  const valueLabel = `${label} · ${usedText}${reset ? ` · ${reset}` : ''}`
   const ratio = quotaUsedRatio(window)
   const tone = quotaTone(window)
   const color = tone === 'danger' ? 'danger' : tone === 'warn' ? 'warning' : 'success'
+  const amountUnit = quotaWindowAmount(window)
+  const withAmount = (value: number | undefined, unit: string) =>
+    `${formatQuotaExact(value)}${unit ? ` ${unit}` : ''}`
+  const usedPercent = t('quotaUsedPercent', { n: percent })
+  // Only a window with a real balance gets a meter: a provider that reports
+  // nothing but its plan name must not render as an empty 0% bar.
+  const hasReading = amountUnit !== null || window.percentage != null || window.remaining != null
+
+  const headline = amountUnit !== null
+    ? `${remainingLabel} ${withAmount(window.remaining, amountUnit)} · ${usedPercent}`
+    : hasReading
+      ? `${remainingLabel} ${Math.round(window.remaining ?? 100 - percent)}%`
+      : ''
+  const detail = amountUnit !== null
+    ? `${usedLabel} ${withAmount(window.used, amountUnit)} / ${withAmount(window.total, amountUnit)}`
+    : hasReading
+      ? `${usedLabel} ${usedPercent}`
+      : ''
+  const valueLabel = [label, headline, detail, reset].filter(Boolean).join(' · ')
+
+  if (!hasReading) {
+    return <div className="text-caption font-medium text-foreground">{label}</div>
+  }
 
   return (
     <Tooltip>
@@ -79,13 +106,16 @@ function WindowMeter({
           >
             <Meter.Output className="flex w-full items-baseline justify-between gap-3 text-caption">
               <span className="min-w-0 truncate font-medium text-foreground">{label}</span>
-              <span className="mono shrink-0 text-foreground/70">{usedText}</span>
+              <span className="mono shrink-0 text-foreground/70">{headline}</span>
             </Meter.Output>
             <Meter.Track>
               <Meter.Fill />
             </Meter.Track>
           </Meter>
-          {reset ? <div className="mt-1 text-caption leading-4 text-muted">{reset}</div> : null}
+          <div className="mt-1 text-caption leading-4 text-muted">
+            {detail}
+            {reset ? `${detail ? ' · ' : ''}${reset}` : ''}
+          </div>
         </div>
       </Tooltip.Trigger>
       <Tooltip.Content>
@@ -130,6 +160,8 @@ export function QuotaMeter({ quota, t, label, usedLabel, remainingLabel, addOnLa
             <WindowMeter
               window={window}
               t={t}
+              usedLabel={usedLabel}
+              remainingLabel={remainingLabel}
               extra={index === 0 ? extra : undefined}
             />
           </div>
