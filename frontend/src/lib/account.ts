@@ -148,10 +148,37 @@ export function formatQuotaAmount(value: number | undefined) {
 
 // Window meters name their own balance, so they keep the exact figure instead
 // of the abbreviated 2.5k form: a percentage alone does not say how much quota
-// is left.
+// is left. Large counts (Codearts' token window) keep digit grouping.
 export function formatQuotaExact(value: number | undefined) {
   if (value == null || !Number.isFinite(value)) return '—'
-  return String(Math.round(value * 100) / 100)
+  const rounded = Math.round(value * 100) / 100
+  return rounded.toLocaleString('en-US', { maximumFractionDigits: 2 })
+}
+
+// Upstream units arrive as their raw wire names. Map the ones a person would
+// read differently and leave anything unknown untouched, so a provider that
+// reports credits in Chinese still renders, and Trae's entitlement pack reads
+// as 积分 instead of the wire name.
+const quotaUnitLabels: Record<string, string> = {
+  entitlement_pack: '积分',
+  entitlement: '积分',
+  points: '积分',
+  point: '积分',
+  credit: 'credits',
+  credits: 'credits',
+  token: 'tokens',
+  tokens: 'tokens',
+  request: '次',
+  requests: '次',
+  seat: '席位',
+  seats: '席位',
+  percent: '%',
+}
+
+export function formatQuotaUnit(unit: string | undefined) {
+  const raw = (unit ?? '').trim()
+  if (!raw) return ''
+  return quotaUnitLabels[raw.toLowerCase()] ?? raw
 }
 
 // A window metered in percent (Codex, Devin, Kimi, Zhipu) has no credit
@@ -162,7 +189,30 @@ export function quotaWindowAmount(window: AccountQuotaWindow): string | null {
   const unit = (window.unit ?? '').trim()
   if (!Number.isFinite(total) || total <= 0) return null
   if (unit.toLowerCase() === 'percent' || unit === '%') return null
-  return unit
+  return formatQuotaUnit(unit)
+}
+
+// Some windows report what was spent without a cap (Codearts' token window).
+// That used count is still a real number, so it is shown instead of falling
+// back to a bare percentage the reader cannot convert into anything.
+export function quotaWindowUsed(window: AccountQuotaWindow): { used: number; unit: string } | null {
+  const used = window.used ?? 0
+  const total = window.total ?? 0
+  const unit = (window.unit ?? '').trim()
+  if (!Number.isFinite(used) || used <= 0) return null
+  if (Number.isFinite(total) && total > 0) return null
+  if (unit.toLowerCase() === 'percent' || unit === '%') return null
+  return { used, unit: formatQuotaUnit(unit) }
+}
+
+// A window is percentage-metered only when it really carries a limit. A window
+// with no numbers at all (MiniMax Code's plan row) is a label, not a reading,
+// and must not render as a 0/100% bar.
+export function quotaWindowIsPercent(window: AccountQuotaWindow) {
+  if (quotaWindowAmount(window) !== null || quotaWindowUsed(window) !== null) return false
+  const total = window.total ?? 0
+  if (!Number.isFinite(total) || total <= 0) return false
+  return window.percentage != null
 }
 
 export function quotaUsedRatio(quota: AccountQuota) {
