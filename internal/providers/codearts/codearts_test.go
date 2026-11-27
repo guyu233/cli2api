@@ -122,6 +122,65 @@ func TestValidateCredential(t *testing.T) {
 	}
 }
 
+func TestStaticAKSKCredential(t *testing.T) {
+	// A long-lived IAM AK/SK pair (as exported by Huawei Cloud credentials.csv
+	// or set via CODEARTS_CLI_AK/SK) has no STS token and no refresh token.
+	pairs := []string{
+		`{"access_key_id":"AK","secret_access_key":"SK"}`,
+		`{"AccessKeyId":"AK","SecretAccessKey":"SK"}`,
+	}
+	for _, raw := range pairs {
+		cred, err := DecodeCredential([]byte(raw))
+		if err != nil {
+			t.Fatalf("DecodeCredential(%s): %v", raw, err)
+		}
+		if cred.AccessKeyID != "AK" || cred.SecretAccessKey != "SK" {
+			t.Fatalf("DecodeCredential(%s) = %+v", raw, cred)
+		}
+		if !cred.Valid() {
+			t.Fatalf("static pair %s should be Valid", raw)
+		}
+		if !cred.Ready() {
+			t.Fatalf("static pair %s should be Ready", raw)
+		}
+		if !cred.StaticAKSK() {
+			t.Fatalf("static pair %s should be StaticAKSK", raw)
+		}
+		if cred.NeedsRefresh(time.Now()) {
+			t.Fatalf("static pair %s should never need refresh", raw)
+		}
+		if err := ValidateCredential([]byte(raw)); err != nil {
+			t.Fatalf("ValidateCredential(%s): %v", raw, err)
+		}
+		imported, err := PrepareImport([]byte(raw))
+		if err != nil || !imported.Ready {
+			t.Fatalf("PrepareImport(%s) = %+v, %v", raw, imported, err)
+		}
+	}
+
+	// The browser OAuth / STS path is unchanged: a fresh STS trio is ready, is
+	// not a static pair, and does not rotate until near expiry.
+	sts := testCredential()
+	if !sts.Ready() || sts.StaticAKSK() {
+		t.Fatalf("STS credential regression: Ready=%v Static=%v", sts.Ready(), sts.StaticAKSK())
+	}
+	if sts.NeedsRefresh(time.Now()) {
+		t.Fatal("fresh STS credential should not need refresh yet")
+	}
+	nearExpiry := sts
+	nearExpiry.ExpiresAt = time.Now().Add(5 * time.Minute).Format(time.RFC3339Nano)
+	if !nearExpiry.NeedsRefresh(time.Now()) {
+		t.Fatal("STS credential near expiry should still rotate")
+	}
+
+	// A refresh-only credential (browser login in progress) is not static and
+	// still relies on refresh, exactly as before this change.
+	refreshOnly := Credential{RefreshToken: "r", CodeVerifier: "v"}
+	if refreshOnly.StaticAKSK() || refreshOnly.Ready() || !refreshOnly.CanRefresh() || !refreshOnly.NeedsRefresh(time.Now()) {
+		t.Fatalf("refresh-only credential regression: %+v", refreshOnly)
+	}
+}
+
 func TestChatNonStreamAndToolMapping(t *testing.T) {
 	var gotBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +234,33 @@ func TestChatNonStreamAndToolMapping(t *testing.T) {
 	}
 	if gotBody["model"] != "GLM-5.2" {
 		t.Fatalf("model = %v", gotBody["model"])
+	}
+}
+
+func TestSendChatWithStaticAKSKOmitsEmptyAuthToken(t *testing.T) {
+	var gotHeader http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotHeader = r.Header.Clone()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer server.Close()
+
+	client, _ := newTestClient(t, server)
+	static := Credential{AccessKeyID: "AK", SecretAccessKey: "SK"}
+	resp, err := client.sendChat(context.Background(), "acct-1", static, []byte(`{"model":"m"}`), "m")
+	if err != nil {
+		t.Fatalf("sendChat: %v", err)
+	}
+	_ = resp.Body.Close()
+	if got := gotHeader.Get("x-auth-token"); got != "" {
+		t.Fatalf("x-auth-token must be absent for static AK/SK, got %q", got)
+	}
+	if got := gotHeader.Get("Authorization"); !strings.HasPrefix(got, "SDK-HMAC-SHA256") {
+		t.Fatalf("missing SDK signature header, got %q", got)
+	}
+	if got := gotHeader.Get("X-Security-Token"); got != "" {
+		t.Fatalf("X-Security-Token must be absent for static AK/SK, got %q", got)
 	}
 }
 
@@ -417,6 +503,41 @@ func TestChatStreamEmitsDeltasAndDone(t *testing.T) {
 	}
 	if resolved.ReasoningLevel != "" {
 		t.Fatalf("unexpected reasoning level %q", resolved.ReasoningLevel)
+	}
+}
+
+func TestChatStreamPreflightMarksCanonicalModelUnusable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != chatPath {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		writeSSE(t, w, map[string]any{"error_code": "4004.200", "error_msg": "benefit not found"})
+	}))
+	defer server.Close()
+	client, _ := newTestClient(t, server)
+	client.rememberCatalog("acct-1", []providers.ModelInfo{
+		{NativeModel: "GLM-5.2", PublicModel: "GLM-5.2"},
+	}, nil)
+	_, _, err := client.ChatStream(context.Background(), "acct-1", translate.ChatRequest{
+		Model:    "codearts/GLM-5.2",
+		Messages: []translate.ChatMessage{{Role: "user", Content: "hi"}},
+	})
+	if err == nil {
+		t.Fatal("ChatStream should surface the embedded model error")
+	}
+	providerErr, ok := err.(*providers.Error)
+	if !ok || providerErr.Kind != accounts.KindModelNotAvailable {
+		t.Fatalf("error = %#v", err)
+	}
+	// The client's prefixed spelling must not leak into the availability key:
+	// the catalog row is what Models() filters on.
+	if !client.modelUnusable("acct-1", "GLM-5.2") {
+		t.Fatal("canonical model should be marked unusable")
+	}
+	if client.modelUnusable("acct-1", "codearts/GLM-5.2") {
+		t.Fatal("raw prefixed model should not be the availability key")
 	}
 }
 

@@ -70,8 +70,9 @@ is not a production promise. The authoritative list is the descriptor registry
 in `internal/providers/registry.go`.
 
 Qoder CN, WorkBuddy, and Trae are implemented; live-account acceptance is still
-pending. Kimi Code CN and CodeArts have single-account end-to-end acceptance;
-CodeArts quota-exhaustion failover is still pending. A PAT-backed Qoder account
+pending. Kimi Code CN and CodeArts have end-to-end acceptance; CodeArts was
+verified on live accounts for proxying, tool calls, model catalog, quota reads,
+and check-in. CodeArts quota-exhaustion failover is still pending. A PAT-backed Qoder account
 runs in-process. A Qoder account that still carries the legacy `qoder-native-v1`
 credential keeps one isolated Node worker and HOME until you sign it in again
 with a PAT. Every other provider uses a Go in-process adapter. All durable

@@ -21,7 +21,7 @@ CLI2API 是一个面向个人部署的 Go + Node 网关：
 - 对外提供 OpenAI Chat Completions、Anthropic Messages、OpenAI Responses 和 Models 兼容接口。
 - 管理多个上游账号，并按 provider、region、model、pin、会话粘性和冷却状态选号。
 - 已存 PAT 的 Qoder 账号（`qoder-pat-v1`）登录、目录、配额、签到和聊天都在 Go 进程内完成，不为该账号启动 Node worker。仍携带旧 `qoder-native-v1` CLI blob 的账号保留每账号一个 Node child process，直到操作者用 PAT 重新登录。其余所有 provider 使用 Go 进程内 adapter，不启动 CLI。
-- 稳定接入是 Qoder、WorkBuddy、Trae CN Work，与控制台账号选择器的分组一致；其余已注册 provider 都是实验性的，不承诺生产可用。provider 清单以 `internal/providers/registry.go` 为准，不要把本文或 README 里的枚举当作完整列表。
+- 稳定接入是 Qoder、WorkBuddy、Trae CN Work 与华为云码道 CodeArts，与控制台账号选择器的分组一致；其余已注册 provider 都是实验性的，不承诺生产可用。provider 清单以 `internal/providers/registry.go` 为准，不要把本文或 README 里的枚举当作完整列表。
 - 控制台负责账号、密钥、设置、目录、日志、登录、导入和更新操作。
 - 这是个人网关，不实现计费、Redis 槽位、多租户商业网关或公开暴露的管理端口。
 
