@@ -3,6 +3,58 @@
 Published user-facing notes for GitHub Releases and the console update page.
 Write upcoming notes as bilingual files in `changelog/unreleased/`.
 
+## 0.7.55 - 2026-11-27
+
+### English
+
+- Trae renews a rejected access token once per request and retries on the same account, and a transient renewal failure no longer marks the account "needs login".
+- A successful credential renewal (Trae, WorkBuddy) clears a stale "needs login" status, so the card stops contradicting the live routing state.
+- WorkBuddy session keepalive covers every enabled account, not only check-in opt-in accounts.
+- Account cards resolve status in one documented order: disabled, recovering, needs login, quota exhausted, cooling, starting, ready, unavailable. A probe failure only reads as "needs login" when it was classified as an auth failure.
+- The accounts page and `GET /api/accounts?refresh=1` now read quota and status live from the upstream on every page load; the stored projection is only used for polling between page loads.
+- When an upstream quota read fails, the account card shows "Quota not readable now" together with the upstream error instead of a stale number, so a logged-in account is never reported with an out-of-date balance.
+- The "quota snapshot is N minutes old" labels are removed; nothing on the account surface presents a cached balance as the current one.
+- CodeArts accounts can now be added with a long-lived IAM AK/SK pair (`access_key_id` + `secret_access_key`), the same keys the official CLI accepts via `CODEARTS_CLI_AK` / `CODEARTS_CLI_SK`. Such a credential needs no browser login or token refresh.
+- Huawei Cloud CodeArts (码道) is a stable provider now: it moves out of the Experimental group in the account picker, and README, architecture summary, deployment and contribution docs list it as stable.
+- CodeArts chat records an unusable-model verdict against the canonical catalog model, so a `codearts/`-prefixed model id rejected by the upstream is also filtered out of the model list.
+- Trae and WorkBuddy now renew a token once per account instead of once per request: concurrent requests wait on the same per-account lock, and a 401 on an old token reuses the token another request already stored. Both providers rotate the refresh token, so this prevents a second exchange from invalidating the live session.
+- An imported token with no known expiry is no longer renewed on every request; the 401 path renews it once when upstream actually rejects it.
+- Trae joins the nightly session keepalive. WorkBuddy keepalive skips a token that a normal request already renewed within six hours, so the sweep no longer rotates a fresh token twice in one day.
+- Account cards show a concrete balance for every provider that reports one: exact figures with digit grouping instead of an abbreviated `1.9k`, and Trae's `entitlement_pack` now reads as `积分`.
+- A window that reports what was spent but no cap (Codearts' chat-token row) shows the spent amount, e.g. `已用 92,693,518 tokens`, instead of a fabricated `剩余 100%`.
+- A window with no numbers at all (MiniMax Code's plan row) renders as its plan label; it no longer draws a 0/100% bar that read as a spent account.
+- Quota windows that carry a real balance (CodeArts packages, Kiro credits, Command Code caps) now show the concrete remaining amount with its unit plus the used / total pair, instead of only "used 22%".
+- Windows metered purely in percent (Codex, Devin, Kimi, Zhipu) now state the remaining percentage next to the used one, and a window that reports only a plan name (MiniMax Code) renders as a plan row instead of an empty 0% bar.
+- Window balances keep the exact figure instead of the abbreviated `2.5k` form, so a card no longer hides whether 1,007.68 or 1,000 credits are left.
+- A bulk quota refresh that fails partway now opens a dialog listing every failed account, with its provider, status badge and the upstream reason, and offers copying the whole list.
+- The toast names the first failed account and its reason instead of dumping one raw upstream error, and account cards clean HTML error pages and internal account ids out of the displayed reason.
+- Removed the experimental Doubao Work (`doubaowork`) provider and its pasted-Cookie login path. Existing Doubao Work accounts are deleted on upgrade.
+
+### 中文
+
+- Trae 在请求遇到 401 时会先续期一次并在同一账号上重试；续期过程中的网络/上游故障不再把账号标成「需要登录」。
+- Trae、WorkBuddy 续期成功后清除遗留的「需要登录」状态，卡片不再与实时调度状态互相矛盾。
+- WorkBuddy 保活覆盖所有启用账号，不再只保开启自动签到的账号。
+- 账号卡片按统一顺序判定状态：已停用、恢复中、需要登录、额度用尽、冷却中、启动中、就绪、不可用；探测失败只有被判定为鉴权失败时才显示「需要登录」。
+- 账号页与 `GET /api/accounts?refresh=1` 在每次进入页面时都实时读取上游额度与状态；本地投影只在页面停留期间的轮询中使用。
+- 上游额度读取失败时，账号卡片显示「暂时读不到额度」并附上上游错误，不再拿旧数字充当当前余额，登录态账号不会被误报成过期余额。
+- 删除「额度快照已过期 N 分钟」一类文案，账号相关界面不再把缓存余额当作当前值展示。
+- 现在可以用长期有效的 IAM AK/SK 密钥对（`access_key_id` + `secret_access_key`）添加码道账号，与官方 CLI 通过 `CODEARTS_CLI_AK` / `CODEARTS_CLI_SK` 接受的密钥一致；这类凭证无需浏览器登录，也不需要令牌刷新。
+- 华为云码道 CodeArts 转正为稳定供应商：账号选择器里从「实验性」移入稳定分组，README、架构说明、部署与贡献文档同步列为稳定接入。
+- 码道聊天把不可用模型的判定记在目录里的规范模型名上，被上游拒绝的 `codearts/` 前缀模型 ID 现在也能正确从模型列表里过滤掉。
+- Trae、WorkBuddy 的续期改为按账号串行：同一账号的并发请求共用一次换取，遇到 401 时若别的请求已写入新 token 就直接复用。两者都会轮换 refresh token，这样可避免第二次换取把仍在使用的会话顶掉。
+- 导入的凭据在过期时间未知时不再每个请求都续期，改由上游真正返回 401 时续期一次。
+- Trae 接入每晚的会话保活；WorkBuddy 保活会跳过普通请求在 6 小时内刚续过的 token，避免同一天把新 token 再轮换一次。
+- 账号卡片对所有能读到余额的供应商都显示具体数字：用完整数字并加千位分隔，不再缩写成 `1.9k`；Trae 的 `entitlement_pack` 显示为「积分」。
+- 只有已用量、没有上限的窗口（Codearts 的对话 token 额度）改为显示已用数量，例如「已用 92,693,518 tokens」，不再伪装成「剩余 100%」。
+- 完全没有数字的窗口（MiniMax Code 的套餐行）只显示套餐名，不再画一条会被误读成额度耗尽的 0% 进度条。
+- 带真实余额的额度窗口（CodeArts 套餐、Kiro credits、Command Code 上限）现在显示具体剩余数量与单位，并给出「已用 / 总量」，不再只有「已用 22%」。
+- 只有百分比的窗口（Codex、Devin、Kimi、Zhipu）在已用百分比旁显示剩余百分比；只上报套餐名、没有任何数字的窗口（MiniMax Code）改为显示套餐名，不再画一条空的 0% 进度条。
+- 窗口余额使用精确数字而非 `2.5k` 这类缩写，卡片不会再掩盖「还剩 1007.68 还是 1000 credits」。
+- 批量刷新额度部分失败时会弹出对话框，逐个列出失败账号、所属平台、状态徽标和上游返回的原因，并支持一键复制全部。
+- 提示条改为「账号名：原因」的形式，不再直接抛出一段上游原始错误；账号卡片也会清洗展示的原因里的 HTML 错误页和内部账号 ID。
+- 移除实验性的豆包工作（`doubaowork`）供应商及其粘贴 Cookie 登录入口；升级时会删除已有的豆包工作账号。
+
 ## 0.7.50 - 2026-11-27
 
 ### English
