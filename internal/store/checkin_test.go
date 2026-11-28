@@ -104,7 +104,7 @@ func TestCheckinClaimLedgerIsAtomicAndSticky(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	account, err := store.Create(ctx, accounts.CreateAccount{Name: "doubao", Provider: "doubaowork", Region: "cn"})
+	account, err := store.Create(ctx, accounts.CreateAccount{Name: "doubao", Provider: "doubaowork", Region: "cn", AutoCheckin: boolPtr(true), CheckinTime: "09:00"})
 	if err != nil {
 		t.Fatal(err)
 	}

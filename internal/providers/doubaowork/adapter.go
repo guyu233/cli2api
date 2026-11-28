@@ -15,6 +15,9 @@ func (c *Client) Adapter() providers.Adapter {
 		ImportExport: importer{},
 		Prober:       c,
 
+		Checkin:       c,
+		CheckinStatus: c,
+
 		SessionInvalidator: c,
 	}
 }

@@ -68,13 +68,13 @@ func TestAdapterWiresCapabilities(t *testing.T) {
 	if adapter.ID != "doubaowork" {
 		t.Fatalf("adapter id = %q", adapter.ID)
 	}
-	for _, capability := range []string{"credential", "chat", "models", "classifier", "import_export", "prober", "login"} {
+	for _, capability := range []string{"credential", "chat", "models", "classifier", "import_export", "prober", "login", "checkin", "checkin_status"} {
 		if !adapter.Supports(capability) {
 			t.Fatalf("adapter missing capability %q", capability)
 		}
 	}
-	if adapter.Supports("checkin") {
-		t.Fatal("check-in must stay out of this restore")
+	if adapter.Checkin == nil || adapter.CheckinStatus == nil {
+		t.Fatal("doubaowork must expose read-only status and a claim path")
 	}
 	if adapter.Login == nil {
 		t.Fatal("doubaowork must advertise browser (Playwright cookie) login")
