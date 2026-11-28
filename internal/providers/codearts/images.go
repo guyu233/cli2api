@@ -27,9 +27,17 @@ import (
 const (
 	imageDownloadTimeout = 45 * time.Second
 	imageMaxBytes        = 20 << 20
+	// imageMaxDataURLBytes bounds an already-inline data: URL. The base64 form
+	// of a 20 MiB image is ~27 MiB, so this leaves room without accepting an
+	// unbounded body from the client.
+	imageMaxDataURLBytes = 32 << 20
 	imageCacheTTL        = 10 * time.Minute
 	imageCacheMaxEntries = 16
 	imageCacheMaxBytes   = 64 << 20
+	// imageFetchUserAgent avoids the 403 that many CDNs and signed object
+	// storage links return for Go's default "Go-http-client" agent. Reproduced
+	// against upload.wikimedia.org: default UA 403, browser UA 200.
+	imageFetchUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
 type imageCacheEntry struct {
@@ -170,7 +178,20 @@ func rewriteImagePartURL(block map[string]any, dataURL string) {
 // client and base64-encoded with a sniffed or declared MIME type.
 func inlineImageURL(ctx context.Context, client *http.Client, cache *imageCache, rawURL string) (string, error) {
 	rawURL = strings.TrimSpace(rawURL)
-	if rawURL == "" || strings.HasPrefix(rawURL, "data:") || !isRemoteImageURL(rawURL) {
+	if rawURL == "" {
+		return rawURL, nil
+	}
+	if strings.HasPrefix(rawURL, "data:") {
+		if len(rawURL) > imageMaxDataURLBytes {
+			return "", &providers.Error{
+				Kind:    accounts.KindInvalidRequest,
+				Status:  http.StatusBadRequest,
+				Message: fmt.Sprintf("codearts inline image exceeds %d bytes", imageMaxDataURLBytes),
+			}
+		}
+		return rawURL, nil
+	}
+	if !isRemoteImageURL(rawURL) {
 		return rawURL, nil
 	}
 	now := time.Now()
@@ -192,6 +213,8 @@ func inlineImageURL(ctx context.Context, client *http.Client, cache *imageCache,
 	if err != nil {
 		return "", wrapImageError(rawURL, err)
 	}
+	req.Header.Set("User-Agent", imageFetchUserAgent)
+	req.Header.Set("Accept", "image/*,*/*;q=0.8")
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", wrapImageError(rawURL, err)

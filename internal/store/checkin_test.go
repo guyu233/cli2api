@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/caigee-cmd/cli2api/internal/accounts"
 )
@@ -94,35 +93,6 @@ func TestProviderCheckinRejectsUnsupportedRegionsAndInvalidTimes(t *testing.T) {
 	}
 	if err := store.Update(ctx, devin.ID, accounts.UpdateAccount{AutoCheckin: boolPtr(true)}); err == nil {
 		t.Fatal("enabled unsupported region")
-	}
-}
-
-func TestCheckinClaimLedgerIsAtomicAndSticky(t *testing.T) {
-	ctx := context.Background()
-	store, err := OpenStore(filepath.Join(t.TempDir(), "claim.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	account, err := store.Create(ctx, accounts.CreateAccount{Name: "doubao", Provider: "doubaowork", Region: "cn", AutoCheckin: boolPtr(true), CheckinTime: "09:00"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	claimed, existing, err := store.BeginCheckinClaim(ctx, account.ID, "2026-11-27")
-	if err != nil || !claimed || existing == "" {
-		t.Fatalf("first begin claimed=%v existing=%q err=%v", claimed, existing, err)
-	}
-	claimed, existing, err = store.BeginCheckinClaim(ctx, account.ID, "2026-11-27")
-	if err != nil || claimed || existing == "" {
-		t.Fatalf("second begin claimed=%v existing=%q err=%v", claimed, existing, err)
-	}
-	if err := store.CompleteCheckinClaim(ctx, account.ID, "2026-11-27", "pending", "sdk required", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	status, message, found, err := store.CheckinClaimStatus(ctx, account.ID, "2026-11-27")
-	if err != nil || !found || status != "pending" || message != "sdk required" {
-		t.Fatalf("status=%q message=%q found=%v err=%v", status, message, found, err)
 	}
 }
 

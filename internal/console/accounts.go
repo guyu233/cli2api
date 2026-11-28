@@ -2,6 +2,7 @@ package console
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -399,7 +400,11 @@ func (h *Handler) HandleAccountByID(w http.ResponseWriter, r *http.Request) {
 	case "login_start":
 		writeJSON(w, http.StatusOK, map[string]any{"authUrl": result.Session.AuthURL, "status": result.LoginStatus})
 	case "login_status":
-		writeJSON(w, http.StatusOK, map[string]any{"login": map[string]any{"status": result.LoginStatus, "message": result.LoginMsg}})
+		payload := map[string]any{"login": map[string]any{"status": result.LoginStatus, "message": result.LoginMsg}}
+		if len(result.LoginQR) > 0 {
+			payload["qr"] = "data:image/png;base64," + base64.StdEncoding.EncodeToString(result.LoginQR)
+		}
+		writeJSON(w, http.StatusOK, payload)
 	case "login_complete":
 		writeJSON(w, http.StatusOK, map[string]any{"login": map[string]any{"status": result.LoginStatus, "message": result.LoginMsg}})
 	case "worker":

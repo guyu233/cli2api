@@ -136,6 +136,23 @@ func TestCatalogServesLastKnownCatalogAfterFailure(t *testing.T) {
 	}
 }
 
+func TestCatalogZeroModelProviderFailureDoesNotMarkGlobalStale(t *testing.T) {
+	catalog := NewCatalog(func(bool, string, CatalogMode) ([]map[string]any, error) {
+		return []map[string]any{{"id": "test-auto"}}, nil
+	})
+	if _, err := catalog.Get(true, "", CatalogModeMerge); err != nil {
+		t.Fatal(err)
+	}
+	catalog.Health.Failure("qoder", errors.New("no running Qoder account"))
+	status := catalog.Status()
+	if status.Stale {
+		t.Fatalf("a provider with zero served models must not mark the whole catalog stale: %+v", status)
+	}
+	if status.SyncedAt == "" {
+		t.Fatal("synced_at must survive a provider failure")
+	}
+}
+
 func TestCatalogRefreshReportsStatus(t *testing.T) {
 	var calls atomic.Int32
 	catalog := NewCatalog(func(bool, string, CatalogMode) ([]map[string]any, error) {

@@ -96,9 +96,6 @@ func TestParseNativeResponsesRejectsMalformedInput(t *testing.T) {
 		"empty":             ``,
 		"missing model":     `{"input":"hi"}`,
 		"blank model":       `{"model":"  ","input":"hi"}`,
-		"missing input":     `{"model":"m"}`,
-		"empty input":       `{"model":"m","input":[]}`,
-		"blank input":       `{"model":"m","input":"  "}`,
 		"scalar item":       `{"model":"m","input":["hi"]}`,
 		"number input":      `{"model":"m","input":3}`,
 		"bad stream":        `{"model":"m","input":"hi","stream":"yes"}`,
@@ -137,6 +134,31 @@ func TestNativeResponsesCompatMatchesLegacyTranslation(t *testing.T) {
 	b, _ := json.Marshal(legacy.Chat)
 	if string(a) != string(b) || len(native.ToolNames) != len(legacy.ToolNames) {
 		t.Fatalf("compat drifted from legacy:\n%s\n%s", a, b)
+	}
+}
+
+func TestNativeResponsesWarmupWithoutInput(t *testing.T) {
+	for _, body := range []string{
+		`{"model":"m"}`,
+		`{"model":"m","input":[]}`,
+	} {
+		request, err := ParseNativeResponses([]byte(body))
+		if err != nil {
+			t.Fatalf("%s: %v", body, err)
+		}
+		if !request.Warmup() {
+			t.Fatalf("%s: warmup = false", body)
+		}
+		if _, err := request.Compat(); err == nil {
+			t.Fatalf("%s: compat path should not serve an empty conversation", body)
+		}
+	}
+	request, err := ParseNativeResponses([]byte(`{"model":"m","input":"hi"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.Warmup() {
+		t.Fatal("a real input must not be tagged warmup")
 	}
 }
 

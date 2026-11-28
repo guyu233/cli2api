@@ -13,6 +13,7 @@ export type BatchLoginRow = {
   phase: BatchLoginPhase
   message: string
   authUrl: string
+  qr: string
 }
 
 const POLL_INTERVAL_MS = 2000
@@ -50,7 +51,7 @@ export function BatchReloginModal({
       return
     }
     cancelled.current = false
-    setRows(accounts.map((account) => ({ account, phase: 'pending', message: '', authUrl: '' })))
+    setRows(accounts.map((account) => ({ account, phase: 'pending', message: '', authUrl: '', qr: '' })))
     if (running.current) return
     running.current = true
     void run(accounts)
@@ -98,6 +99,7 @@ export function BatchReloginModal({
           const status = await fetchLoginStatus(account.id)
           const login = status.login || {}
           const message = login.message || ''
+          if (status.qr) patch(account.id, { qr: status.qr })
           if (login.status === 'ok') {
             patch(account.id, { phase: 'ok', message: message || t('reloginDone') })
             settled = true
@@ -150,6 +152,12 @@ export function BatchReloginModal({
                     ) : null}
                   </div>
                   {row.message ? <p className="mt-1 break-words text-caption text-foreground/70">{row.message}</p> : null}
+                  {row.qr ? (
+                    <div className="mt-2 flex items-center gap-2">
+                      <img src={row.qr} alt={t('wizardScanQR')} className="size-32 rounded-lg border border-divider bg-white p-1" />
+                      <span className="text-caption text-foreground/70">{t('wizardScanQR')}</span>
+                    </div>
+                  ) : null}
                   {row.authUrl ? <p className="mono mt-1 truncate text-caption text-muted" title={row.authUrl}>{row.authUrl}</p> : null}
                 </div>
               ))}

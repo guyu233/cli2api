@@ -302,7 +302,10 @@ type AccountAdminResult struct {
 	LoginDone   bool
 	LoginStatus string
 	LoginMsg    string
-	Worker      providers.AdminResponse
+	// LoginQR is the current scan-to-login QR PNG, present only while a
+	// provider is waiting for the operator to scan it.
+	LoginQR []byte
+	Worker  providers.AdminResponse
 }
 
 func (a *Accounts) Admin(ctx context.Context, input AccountAdminAction) (AccountAdminResult, error) {
@@ -339,7 +342,15 @@ func (a *Accounts) Admin(ctx context.Context, input AccountAdminAction) (Account
 			if done {
 				status = "ok"
 			}
-			return AccountAdminResult{Kind: "login_status", LoginDone: done, LoginStatus: status, LoginMsg: message}, nil
+			result := AccountAdminResult{Kind: "login_status", LoginDone: done, LoginStatus: status, LoginMsg: message}
+			if !done {
+				// A scan-to-login provider keeps a QR frame on disk; read it
+				// per poll so the console can paint it without a second endpoint.
+				if qr, qrErr := a.LoginQR(ctx, input.AccountID); qrErr == nil {
+					result.LoginQR = qr
+				}
+			}
+			return result, nil
 		}
 		return a.workerAdmin(ctx, input)
 	case "login/callback":

@@ -2,6 +2,7 @@ package codex
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/caigee-cmd/cli2api/internal/providers"
 	"github.com/caigee-cmd/cli2api/internal/translate"
@@ -11,6 +12,9 @@ import (
 // payload. Upstream is the ChatGPT backend Responses endpoint, so messages map
 // to `input` items and most chat-completions fields carry over directly.
 func buildBody(req translate.ChatRequest, caps providers.ModelCapabilities) ([]byte, providers.ResolvedChat, error) {
+	// Codex upstream represents tool output as text; expose tool-result
+	// screenshots as a trailing user image turn so they are not dropped.
+	req = translate.MaterializeToolResultImages(req)
 	obj := map[string]any{
 		"model":  req.Model,
 		"stream": true,
@@ -142,7 +146,11 @@ func responsesContent(msg translate.ChatMessage) (any, error) {
 				}
 				parts = append(parts, map[string]any{"type": partType, "text": part["text"]})
 			case "image_url":
-				parts = append(parts, map[string]any{"type": "input_image", "image_url": imageURLString(part["image_url"])})
+				url := imageURLString(part["image_url"])
+				if strings.TrimSpace(url) == "" {
+					return nil, errUnsupportedContent("image_url without url")
+				}
+				parts = append(parts, map[string]any{"type": "input_image", "image_url": url})
 			default:
 				return nil, errUnsupportedContent(typ)
 			}

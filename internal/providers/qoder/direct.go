@@ -478,6 +478,9 @@ func BuildPlainChatBody(req translate.ChatRequest, now time.Time) map[string]any
 	if now.IsZero() {
 		now = time.Now()
 	}
+	// Qoder's tool message is text-only; surface tool-result images as a
+	// trailing user turn so screenshots reach the vision model.
+	req = translate.MaterializeToolResultImages(req)
 	var systemParts []string
 	messages := make([]map[string]any, 0, len(req.Messages))
 	for _, message := range req.Messages {

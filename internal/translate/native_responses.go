@@ -30,6 +30,10 @@ type NativeResponsesRequest struct {
 	fields map[string]json.RawMessage
 	model  string
 	stream bool
+	// warmup marks a request with no conversation input. Codex CLI sends one
+	// at startup to verify the provider; it carries only instructions and/or
+	// tools, and the gateway answers it without an upstream call.
+	warmup bool
 }
 
 // ParseNativeResponses validates a Responses body without flattening it. It
@@ -68,7 +72,7 @@ func ParseNativeResponses(body []byte) (*NativeResponsesRequest, error) {
 	switch jsonKind(fields["input"]) {
 	case '"':
 		if text, _ := rawJSONString(fields["input"]); strings.TrimSpace(text) == "" {
-			return nil, errors.New("input required")
+			request.warmup = true
 		}
 	case '[':
 		var items []json.RawMessage
@@ -76,7 +80,7 @@ func ParseNativeResponses(body []byte) (*NativeResponsesRequest, error) {
 			return nil, fmt.Errorf("input: %w", err)
 		}
 		if len(items) == 0 {
-			return nil, errors.New("input required")
+			request.warmup = true
 		}
 		for index, item := range items {
 			if jsonKind(item) != '{' {
@@ -84,7 +88,7 @@ func ParseNativeResponses(body []byte) (*NativeResponsesRequest, error) {
 			}
 		}
 	case 0:
-		return nil, errors.New("input required")
+		request.warmup = true
 	default:
 		return nil, errors.New("input must be a string or an array")
 	}
@@ -121,6 +125,9 @@ func (r *NativeResponsesRequest) Model() string { return r.model }
 // Stream is the client's requested output mode, independent of how the
 // upstream transports the response.
 func (r *NativeResponsesRequest) Stream() bool { return r.stream }
+
+// Warmup reports a request with no conversation input (a Codex CLI probe).
+func (r *NativeResponsesRequest) Warmup() bool { return r.warmup }
 
 // Fields returns a private copy of the top-level members for one attempt. The
 // map and every value slice are fresh, so the caller may rewrite them freely.

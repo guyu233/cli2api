@@ -89,7 +89,7 @@ func (h *Handler) HandleAnthropicMessages(w http.ResponseWriter, r *http.Request
 		CachedTokens: result.CachedTokens, UsageSource: result.UsageSource, Credits: result.Credits,
 		ConsumedCredits: result.ConsumedCredits, Model: result.Model,
 	}, nil, result.AttemptCount, result.ReasoningLevel)
-	writeJSON(w, http.StatusOK, anthropicMessageResponse(execution.RequestID, firstNonEmpty(result.Model, execution.PublicModel), result.Content, result.Reasoning, decodeOpenAIToolCalls(result.ToolCalls), result.FinishReason, result.PromptTokens, result.CompletionTokens, result.CacheReadTokens, result.CacheWriteTokens))
+	writeJSON(w, http.StatusOK, anthropicMessageResponse(execution.RequestID, firstNonEmpty(execution.PublicModel, result.Model), result.Content, result.Reasoning, decodeOpenAIToolCalls(result.ToolCalls), result.FinishReason, result.PromptTokens, result.CompletionTokens, result.CacheReadTokens, result.CacheWriteTokens))
 }
 
 func (h *Handler) handleAnthropicMessagesStream(w http.ResponseWriter, r *http.Request, execution Execution) {

@@ -1041,6 +1041,10 @@ type routeLoop struct {
 	attempts       int
 	pinned         string
 	index          int
+	// lastModel is the concrete model dispatched on the most recent attempt.
+	// failover uses it to tell a model-scoped failure from an account-wide one
+	// without re-resolving a member that the failure just cooled.
+	lastModel string
 	// regionPinned records that this request chose its region implicitly from
 	// the first picked account (not from a model prefix, grant, or explicit
 	// pin). A later failure releases that pin so failover can cross regions.
@@ -1152,14 +1156,15 @@ func (e ChatExecutor) newRouteLoop(ctx context.Context, prefer, providerFilter s
 			tierBudget = attempts
 			attempts *= aggPlan.PriorityTierCount()
 			if e.Pool != nil {
-				query := e.routeQuery("", providerFilter, regionFilter, req.Model, allowed, nil, nil, aggPlan)
-				if n := e.Pool.LenRoute(query); n > 0 && n < attempts {
+				// Count (account, member model) deployments, not accounts:
+				// several members can live on one account and each is a real
+				// failover target.
+				if n := aggPlan.CandidateCount(e.Pool.Items()); n > 0 && n < attempts {
 					attempts = n
 				}
 			}
 		} else if e.Pool != nil {
-			query := e.routeQuery("", providerFilter, regionFilter, req.Model, allowed, nil, nil, aggPlan)
-			if n := e.Pool.LenRoute(query); n > 0 && n < attempts {
+			if n := aggPlan.CandidateCount(e.Pool.Items()); n > 0 && n < attempts {
 				attempts = n
 			}
 		}
@@ -1272,8 +1277,9 @@ func (l routeLoop) attemptModel(item Item, req translate.ChatRequest) string {
 // dispatchRequest returns the request for this attempt with an aggregated
 // virtual model resolved to the concrete model chosen for this item. It only
 // touches the local copy of the request; the shared Item is never modified.
-func (l routeLoop) dispatchRequest(item Item, req translate.ChatRequest) translate.ChatRequest {
+func (l *routeLoop) dispatchRequest(item Item, req translate.ChatRequest) translate.ChatRequest {
 	req.Model = l.attemptModel(item, req)
+	l.lastModel = req.Model
 	return req
 }
 
@@ -1325,7 +1331,16 @@ func (l *routeLoop) exclude(item Item) {
 // that leaves no cooldown invalidates the binding instead, because retrying
 // that account first next turn would fail identically.
 func (l *routeLoop) failover(e ChatExecutor, item Item, classified Classified) {
-	l.exclude(item)
+	// A model-scoped failure does not make the whole account unusable. If the
+	// plan has another member this account can still serve, keep it in the
+	// candidate set: the resolver skips the cooled model and dispatchRequest
+	// fills in the healthy sibling on the next attempt. Without this, the first
+	// failure would exclude the account and the request would fail even though
+	// a sibling model on it is healthy.
+	keepAccount := l.keepAccountForSibling(e, item)
+	if !keepAccount {
+		l.exclude(item)
+	}
 	l.noteTierFailure(e, item)
 	// Any non-pin route that already carries a session key can have a stale
 	// binding (including a sticky-escape that started on another account).
@@ -1341,6 +1356,29 @@ func (l *routeLoop) failover(e ChatExecutor, item Item, classified Classified) {
 			e.SessionAffinity.Forget(l.routing.SessionKey)
 		}
 	}
+}
+
+// keepAccountForSibling reports whether the last dispatched model belongs to an
+// aggregation plan and another member of the same account can serve this
+// request. The pool item is re-read so the just-recorded model cooldown is
+// visible even when the failure path held a copied Item.
+func (l *routeLoop) keepAccountForSibling(e ChatExecutor, item Item) bool {
+	if l.plan == nil || strings.TrimSpace(l.lastModel) == "" {
+		return false
+	}
+	if e.Pool != nil {
+		if fresh, ok := e.Pool.ByID(item.ID); ok {
+			item = fresh
+		}
+	}
+	if !item.DownUntil.IsZero() && time.Now().Before(item.DownUntil) {
+		return false
+	}
+	member, ok := l.plan.matchMember(item)
+	if !ok {
+		return false
+	}
+	return accounts.CanonicalModelID(member.Model) != accounts.CanonicalModelID(l.lastModel)
 }
 
 // noteTierFailure gives each priority tier its own retry budget. Once the

@@ -109,24 +109,34 @@ func (e ChatExecutor) Prepare(in PrepareInput) (PreparedRequest, error) {
 	// no cross-request mutable state). Only an aggregation key may opt into the
 	// logical namespace: a normal key always routes the real provider model, so
 	// a logical ID that collides with a real catalog ID can never shadow it.
+	//
+	// A logical ID may itself contain "/" (the console accepts vendor-style
+	// names such as "deepseek/v4-flash"), so the exact aggregation lookup runs
+	// before provider-prefix parsing and wins for aggregation keys even when
+	// the first segment happens to be a real provider name.
 	var aggregatePlan *AggregatePlan
-	if in.Aggregations != nil && in.ModelAggregation && ProviderPrefix(publicModel) == "" {
+	if in.Aggregations != nil && in.ModelAggregation {
 		if plan, ok := e.resolveAggregation(in.Context, in.Aggregations, publicModel, in.Identity.AllowedProviders); ok {
 			aggregatePlan = plan
 		}
 	}
+	aggregationName := aggregatePlan != nil
 	if in.ModelAggregation {
 		// An aggregation key's contract is stricter than the shared pool: it may
 		// only call the provider-neutral names it exposes — an account alias or a
 		// configured logical model. A real catalog id or a provider-prefixed id
-		// would leak the split view back.
-		if strings.Contains(strings.TrimSpace(publicModel), "/") ||
-			(aggregatePlan == nil && !e.servesAggregationAlias(publicModel, in.Identity)) {
-			return PreparedRequest{}, &PrepareError{
-				Status:  400,
-				Code:    "model_not_aggregated",
-				Message: "this API key only accepts its aggregated model names; call /v1/models for the list",
+		// would leak the split view back. Aliases are checked exactly as sent,
+		// so an alias that intentionally contains "/" still resolves and a real
+		// provider-prefixed catalog id without one is refused.
+		if aggregatePlan == nil {
+			if !e.servesAggregationAlias(publicModel, in.Identity) {
+				return PreparedRequest{}, &PrepareError{
+					Status:  400,
+					Code:    "model_not_aggregated",
+					Message: "this API key only accepts its aggregated model names; call /v1/models for the list",
+				}
 			}
+			aggregationName = true
 		}
 	} else if RejectsBareModel(publicModel, in.CrossProviderPool) {
 		return PreparedRequest{}, &PrepareError{
@@ -136,9 +146,19 @@ func (e ChatExecutor) Prepare(in PrepareInput) (PreparedRequest, error) {
 		}
 	}
 
-	providerFilter, modelRegion := ResolveProviderFilter(&request, in.CrossProviderPool || in.ModelAggregation)
+	// The plan already carries each member's provider/region. Parsing the
+	// virtual ID as a provider prefix would either drop the plan's members or
+	// reject a logical ID whose first segment is a provider name. The same
+	// applies to a provider-neutral alias: both are selected by exact name, not
+	// by the provider/region prefix grammar.
+	providerFilter, modelRegion := "", ""
+	if !aggregationName {
+		providerFilter, modelRegion = ResolveProviderFilter(&request, in.CrossProviderPool || in.ModelAggregation)
+	}
 	prefer := strings.TrimSpace(in.PreferAccount)
-	providerFilter = ApplyPinnedProviderFilter(e.Pool, providerFilter, publicModel, prefer)
+	if aggregatePlan == nil {
+		providerFilter = ApplyPinnedProviderFilter(e.Pool, providerFilter, publicModel, prefer)
+	}
 	if providerFilter != "" && !in.Identity.AllowsProvider(providerFilter) {
 		return PreparedRequest{}, &PrepareError{
 			Status:  403,
@@ -295,7 +315,7 @@ func (e ChatExecutor) resolveAggregation(ctx context.Context, resolver Aggregati
 // "<provider>/" model id. Command Code's own model ids are org-namespaced
 // ("deepseek/…", "moonshotai/…"), so its provider prefix sits in front of an
 // already-namespaced id ("command/deepseek/…").
-var providerPrefixes = []string{"qoder/", "workbuddy/", "trae/", "devin/", "command/", "codex/", "zhipu/", "qwenwork/", "kimi/", "codearts/", "kiro/", "meta/", "muse/", "doubaowork/", "minimaxcode/"}
+var providerPrefixes = []string{"qoder/", "workbuddy/", "trae/", "devin/", "command/", "codex/", "zhipu/", "qwenwork/", "kimi/", "codearts/", "kiro/", "meta/", "muse/", "minimaxcode/"}
 
 // regionDashSuffixes are the region qualifiers that may be appended to a
 // provider prefix with a dash: "workbuddy-cn/", "workbuddy-gl/",

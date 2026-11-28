@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/caigee-cmd/cli2api/internal/accounts"
 )
@@ -93,6 +94,13 @@ func (p *AggregatePlan) matchMember(item Item) (accounts.AggregationMember, bool
 		if !itemHasModel(item, member.Model) {
 			continue
 		}
+		// A model-scoped cooldown applies to exactly one model on this account.
+		// Another member of the same logical model may still be healthy, so a
+		// cooled high-priority member must not hide it until the whole account's
+		// cooldown expires.
+		if p.memberCooling(item, member.Model) {
+			continue
+		}
 		// A deployment pinned to this exact account is more specific than a
 		// legacy provider-wide member with the same model. It must supply the
 		// plan's priority/weight for this account even when the wildcard member
@@ -109,6 +117,48 @@ func (p *AggregatePlan) matchMember(item Item) (accounts.AggregationMember, bool
 		return *wildcard, true
 	}
 	return accounts.AggregationMember{}, false
+}
+
+// CandidateCount counts the concrete (account, member model) deployments this
+// plan can attempt. LenRoute counts accounts, which understates a plan that puts
+// several members on one account; using it to cap attempts would silently turn
+// allow_fallbacks into a single attempt for such plans.
+func (p *AggregatePlan) CandidateCount(items []Item) int {
+	if p == nil {
+		return 0
+	}
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		provider := strings.ToLower(strings.TrimSpace(itemProvider(item)))
+		region := NormalizeRegion(itemRegion(item))
+		for _, member := range p.byProvider[provider] {
+			if member.AccountID != "" && member.AccountID != item.ID {
+				continue
+			}
+			if member.Region != "" && NormalizeRegion(member.Region) != region {
+				continue
+			}
+			if !itemHasModel(item, member.Model) {
+				continue
+			}
+			key := item.ID + "|" + accounts.CanonicalModelID(member.Model)
+			seen[key] = struct{}{}
+		}
+	}
+	return len(seen)
+}
+
+// memberCooling reports whether this account has a model-scoped cooldown for
+// the member's concrete model. It reads only the Item snapshot passed to the
+// resolver, so it is safe under Pool.mu. Account-wide cooldowns are handled by
+// routeBaseMatches and are deliberately not duplicated here.
+func (p *AggregatePlan) memberCooling(item Item, model string) bool {
+	key := routeModel(AccountModelID(item, model))
+	if key == "" || len(item.ModelDownUntil) == 0 {
+		return false
+	}
+	until, ok := item.ModelDownUntil[key]
+	return ok && time.Now().Before(until)
 }
 
 // CanServeAccount reports whether this account can serve at least one member

@@ -26,7 +26,6 @@ import (
 	"github.com/caigee-cmd/cli2api/internal/providers/codex"
 	"github.com/caigee-cmd/cli2api/internal/providers/command"
 	"github.com/caigee-cmd/cli2api/internal/providers/devin"
-	"github.com/caigee-cmd/cli2api/internal/providers/doubaowork"
 	"github.com/caigee-cmd/cli2api/internal/providers/kimi"
 	"github.com/caigee-cmd/cli2api/internal/providers/kiro"
 	"github.com/caigee-cmd/cli2api/internal/providers/meta"
@@ -63,16 +62,6 @@ type App struct {
 	Console                *appconsole.Handler
 	Update                 *appupdate.Coordinator
 	HTTP                   *httpserver.Server
-}
-
-// doubaoworkLoginScript resolves the short-lived Playwright cookie-login
-// helper. Operators can override the path; the default is repo-relative to
-// the working directory the server is started from.
-func doubaoworkLoginScript() string {
-	if path := strings.TrimSpace(os.Getenv("DOUBAOWORK_LOGIN_SCRIPT")); path != "" {
-		return path
-	}
-	return filepath.Join("worker", "src", "doubaowork-login.mjs")
 }
 
 func New(cfg config.Config) *App {
@@ -158,13 +147,6 @@ func New(cfg config.Config) *App {
 	providerReg.Register(codearts.NewClient(store).Adapter())
 	providerReg.Register(kiro.NewClient(store).Adapter())
 	providerReg.Register(meta.NewClient(store).Adapter())
-	doubaoworkClient := doubaowork.NewClient(store)
-	doubaoworkClient.SetLoginConfig(doubaowork.LoginConfig{
-		NodeBinary:  cfg.NodeBinary,
-		ScriptPath:  doubaoworkLoginScript(),
-		ProfileRoot: filepath.Join(dataDir, "doubaowork-profiles"),
-	})
-	providerReg.Register(doubaoworkClient.Adapter())
 	qoderClient := qoder.NewClient()
 	qoderClient.Bind(manager.AccountURL, manager.ProxyAPIKey)
 	qoderClient.SetDirect(qoder.NewDirect(store, func(ctx context.Context, accountID string) (string, error) {
@@ -185,7 +167,6 @@ func New(cfg config.Config) *App {
 	manager.SetProviders(providerReg)
 	manager.SetWorkBuddy(workbuddyClient)
 	manager.SetSessionKeepalive("trae", traeClient)
-	manager.SetSessionKeepalive("doubaowork", doubaoworkClient)
 	go manager.RefreshAll(context.Background(), false)
 	recorder := applogs.NewRequestRecorder(store)
 	stopLogs := make(chan struct{})

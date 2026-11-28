@@ -69,6 +69,113 @@ func TestAggregateExcludesUnknownCatalogOutsideMemberRegion(t *testing.T) {
 	}
 }
 
+func TestAggregateModelScopedCooldownFallsBackOnSameAccount(t *testing.T) {
+	now := time.Now()
+	p := NewPool(nil, nil)
+	p.Upsert(Item{
+		ID: "q1", Provider: "qoder", Region: "global", Models: []string{"model-a", "model-b"},
+		ModelDownUntil: map[string]time.Time{"model-a": now.Add(time.Hour)},
+	})
+	plan := NewAggregatePlan(accounts.Aggregation{
+		ID: "my-model", Strategy: accounts.AggregationPriority, MaxAttempts: 2,
+		Members: []accounts.AggregationMember{
+			{Provider: "qoder", Model: "model-a", Priority: 0, Weight: 100},
+			{Provider: "qoder", Model: "model-b", Priority: 1, Weight: 100},
+		},
+	})
+	item, ok := p.ByID("q1")
+	if !ok {
+		t.Fatal("q1 missing")
+	}
+	selected, ok := plan.matchMember(item)
+	if !ok || selected.Model != "model-b" {
+		t.Fatalf("cooled member must fall back to a healthy sibling: member=%+v ok=%v", selected, ok)
+	}
+	for i := 0; i < 3; i++ {
+		picked, ok := p.PickRoute(aggRouteQuery(plan))
+		if !ok || picked.ID != "q1" {
+			t.Fatalf("pick %d = %+v ok=%v", i, picked, ok)
+		}
+	}
+	if resolved := plan.resolver()(item); resolved != "model-b" {
+		t.Fatalf("resolver=%q, want model-b", resolved)
+	}
+	cooledOnly := NewAggregatePlan(accounts.Aggregation{
+		ID: "my-model", Strategy: accounts.AggregationPriority,
+		Members: []accounts.AggregationMember{{Provider: "qoder", Model: "model-a", Priority: 0, Weight: 100}},
+	})
+	if _, ok := cooledOnly.matchMember(item); ok {
+		t.Fatal("a model-scoped cooled member matched on its own")
+	}
+}
+
+func TestRouteLoopKeepsAccountForHealthyAggregationSibling(t *testing.T) {
+	now := time.Now()
+	p := NewPool(nil, nil)
+	p.Upsert(Item{
+		ID: "q1", Provider: "qoder", Region: "global", Models: []string{"model-a", "model-b"},
+		ModelDownUntil: map[string]time.Time{"model-a": now.Add(time.Hour)},
+	})
+	plan := NewAggregatePlan(accounts.Aggregation{
+		ID: "my-model", Strategy: accounts.AggregationPriority, MaxAttempts: 2,
+		Members: []accounts.AggregationMember{
+			{Provider: "qoder", Model: "model-a", Priority: 0, Weight: 100},
+			{Provider: "qoder", Model: "model-b", Priority: 1, Weight: 100},
+		},
+	})
+	loop := routeLoop{plan: plan, lastModel: "model-a"}
+	executor := NewChatExecutor(p, "")
+	if !loop.keepAccountForSibling(executor, Item{ID: "q1"}) {
+		t.Fatal("model-scoped failure must keep the account for a healthy sibling")
+	}
+	loop.lastModel = "model-b"
+	if loop.keepAccountForSibling(executor, Item{ID: "q1"}) {
+		t.Fatal("the same member must not be retried on the account")
+	}
+	loop.plan = nil
+	if loop.keepAccountForSibling(executor, Item{ID: "q1"}) {
+		t.Fatal("a non-aggregated route must keep excluding the failed account")
+	}
+}
+
+func TestAggregationAttemptBudgetCountsMultipleMembersOnOneAccount(t *testing.T) {
+	p := NewPool(nil, nil)
+	p.Upsert(Item{
+		ID: "q1", Provider: "qoder", Region: "global", Models: []string{"model-a", "model-b"},
+	})
+	plan := NewAggregatePlan(accounts.Aggregation{
+		ID: "my-model", Strategy: accounts.AggregationPriority,
+		AllowFallbacks: true, MaxAttempts: 3,
+		Members: []accounts.AggregationMember{
+			{Provider: "qoder", Model: "model-a", Priority: 0, Weight: 100},
+			{Provider: "qoder", Model: "model-b", Priority: 1, Weight: 100},
+		},
+	})
+	ctx := WithAggregatePlan(context.Background(), plan)
+	executor := ChatExecutor{Pool: p}
+	loop := executor.newRouteLoop(ctx, "", "", translate.ChatRequest{Model: "my-model"})
+	if loop.attempts != 2 {
+		t.Fatalf("attempts=%d, want 2: one account must still yield one attempt per member", loop.attempts)
+	}
+	item, _, err := loop.pickNext(executor, "my-model")
+	if err != nil {
+		t.Fatalf("first pick: %v", err)
+	}
+	loop.dispatchRequest(item, translate.ChatRequest{Model: "my-model"})
+	executor.markClassified(item.ID, Classified{Kind: accounts.KindRateLimit, Cooldown: time.Minute}, "model-a")
+	loop.failover(executor, item, Classified{Kind: accounts.KindRateLimit, Cooldown: time.Minute})
+	next, _, err := loop.pickNext(executor, "my-model")
+	if err != nil {
+		t.Fatalf("second pick: %v", err)
+	}
+	if next.ID != "q1" {
+		t.Fatalf("second pick=%s, want q1", next.ID)
+	}
+	if got := loop.attemptModel(next, translate.ChatRequest{Model: "my-model"}); got != "model-b" {
+		t.Fatalf("second attempt model=%q, want model-b", got)
+	}
+}
+
 // An account-specific deployment is more specific than a provider-wide
 // wildcard member for the same model, even when the wildcard sorts first.
 func TestAggregatePinnedMemberWinsOverWildcard(t *testing.T) {

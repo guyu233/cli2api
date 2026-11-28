@@ -77,9 +77,18 @@ func (e *StreamRelayWriteError) Unwrap() error {
 	return e.err
 }
 
-func RelayOpenAIStream(w http.ResponseWriter, body io.Reader) (stats StreamRelayStats, returnErr error) {
+// RelayOpenAIStream copies an OpenAI-compatible SSE stream to the client.
+// An optional model overrides the model field in every assistant chunk so an
+// account alias or a provider-neutral aggregation id is echoed exactly as the
+// client sent it; upstream member names must not leak through a stream that
+// /v1/models advertised under another id.
+func RelayOpenAIStream(w http.ResponseWriter, body io.Reader, model ...string) (stats StreamRelayStats, returnErr error) {
 	countedBody := &countingReader{reader: body}
 	defer func() { stats.BytesRead = countedBody.bytes }()
+	var publicModel string
+	if len(model) > 0 {
+		publicModel = strings.TrimSpace(model[0])
+	}
 	var writer io.Writer = w
 	if flusher, ok := w.(http.Flusher); ok {
 		writer = StreamFlushWriter{W: w, F: flusher}
@@ -166,9 +175,17 @@ func RelayOpenAIStream(w http.ResponseWriter, body io.Reader) (stats StreamRelay
 							now := time.Now()
 							stats.FirstTokenAt = &now
 						}
-						if relayed := normalizer.absorb(decoded); relayed == nil {
+						if publicModel != "" {
+							decoded["model"] = publicModel
+						}
+						relayed := normalizer.absorb(decoded)
+						if relayed == nil {
 							continue
-						} else if encoded, err := json.Marshal(relayed); err == nil {
+						}
+						if publicModel != "" {
+							relayed["model"] = publicModel
+						}
+						if encoded, err := json.Marshal(relayed); err == nil {
 							line = "data: " + string(encoded)
 						}
 						if normalizer.finish != "" {

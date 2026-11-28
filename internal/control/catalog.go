@@ -286,10 +286,12 @@ func (c *Catalog) Status() CatalogStatus {
 		IntervalSeconds: int(interval / time.Second),
 		Providers:       c.Health.Snapshot(),
 	}
-	// A provider behind its last success makes the whole view stale even when the
-	// last full refresh succeeded for the others.
+	// A provider behind its last success makes the whole view stale only when
+	// it actually contributes models. A provider with no account yet (for
+	// example qoder after a fresh install) has zero rows and must not mark the
+	// provider's catalog stale for every client.
 	for _, provider := range status.Providers {
-		if provider.Stale {
+		if provider.Stale && provider.Models > 0 {
 			status.Stale = true
 			break
 		}

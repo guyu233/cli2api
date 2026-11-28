@@ -59,6 +59,9 @@ type cmdTool struct {
 // buildGenerateRequest converts an internal chat request into the strict
 // /alpha/generate envelope. model must already be resolved to a catalog id.
 func buildGenerateRequest(req translate.ChatRequest, model string) ([]byte, error) {
+	// A command tool result is text-only; keep tool-result screenshots by
+	// moving them to a trailing user image turn.
+	req = translate.MaterializeToolResultImages(req)
 	system, messages := buildMessages(req.Messages)
 	tools := buildTools(req.Tools)
 	envelope := generateRequest{

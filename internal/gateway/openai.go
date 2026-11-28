@@ -152,7 +152,7 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 				flusher.Flush()
 			}
 		}
-		stats, relayErr := RelayOpenAIStream(w, upstream.Response.Body)
+		stats, relayErr := RelayOpenAIStream(w, upstream.Response.Body, publicModel)
 		status := streamLogStatus(relayErr, stats.SawDone, r.Context().Err() != nil)
 		h.recordStreamDiagnostic(requestID, upstream.Response, started, stats, relayErr, r.Context().Err())
 		ttfb := upstream.TTFBMs

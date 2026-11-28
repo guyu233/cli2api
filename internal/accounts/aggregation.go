@@ -115,6 +115,52 @@ func NormalizeAggregationStrategy(value string) AggregationStrategy {
 	}
 }
 
+// normalizeAggregationModel stores the concrete upstream model without the
+// provider/region prefix a client-facing model list may have added. Without
+// this, a member created from a prefixed list entry ("testprovider/test-auto")
+// passes validation and catalog resolution but can never match an account
+// catalog or be dispatched: adapters receive the virtual prefix as a model id.
+func normalizeAggregationModel(provider, region, model string) string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return ""
+	}
+	first, rest, found := strings.Cut(model, "/")
+	if !found {
+		return model
+	}
+	candidate := strings.ToLower(strings.TrimSpace(first))
+	family := NormalizeProviderFamily(provider)
+	names := []string{family}
+	if raw := strings.ToLower(strings.TrimSpace(provider)); raw != "" && raw != family {
+		names = append(names, raw)
+	}
+	matched := false
+	for _, name := range names {
+		if candidate == name {
+			matched = true
+			break
+		}
+		if region != "" && candidate == name+"-"+region {
+			matched = true
+			break
+		}
+		for _, suffix := range []string{"-cn", "-gl", "-global", "-auto"} {
+			if candidate == name+suffix {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			break
+		}
+	}
+	if !matched {
+		return model
+	}
+	return strings.TrimSpace(rest)
+}
+
 func normalizeAggregationMembers(members []AggregationMember) ([]AggregationMember, error) {
 	if len(members) == 0 {
 		return nil, fmt.Errorf("aggregation requires at least one member")
@@ -125,11 +171,12 @@ func normalizeAggregationMembers(members []AggregationMember) ([]AggregationMemb
 	out := make([]AggregationMember, 0, len(members))
 	seen := map[string]struct{}{}
 	for _, member := range members {
-		provider := strings.ToLower(strings.TrimSpace(member.Provider))
+		rawProvider := strings.ToLower(strings.TrimSpace(member.Provider))
+		provider := NormalizeProviderFamily(rawProvider)
 		region := strings.ToLower(strings.TrimSpace(member.Region))
-		model := strings.TrimSpace(member.Model)
+		model := normalizeAggregationModel(rawProvider, region, member.Model)
 		accountID := strings.TrimSpace(member.AccountID)
-		if provider == "" || model == "" {
+		if rawProvider == "" || model == "" {
 			return nil, fmt.Errorf("aggregation member requires provider and model")
 		}
 		if len(accountID) > 256 {

@@ -71,7 +71,6 @@ const labelKeys: Record<string, string> = {
   'kiro-us-east-1': 'accountTypeKiroUS',
   'kiro-eu-central-1': 'accountTypeKiroEU',
   'meta-global': 'accountTypeMetaGlobal',
-  'doubaowork-cn': 'accountTypeDoubaoworkCN',
   'minimaxcode-cn': 'accountTypeMiniMaxCodeCN',
   'minimaxcode-global': 'accountTypeMiniMaxCodeGlobal',
 }
@@ -93,7 +92,6 @@ const hintKeys: Record<string, string> = {
   'kiro-us-east-1': 'accountTypeKiroUSHint',
   'kiro-eu-central-1': 'accountTypeKiroEUHint',
   'meta-global': 'accountTypeMetaGlobalHint',
-  'doubaowork-cn': 'accountTypeDoubaoworkCNHint',
   'minimaxcode-cn': 'accountTypeMiniMaxCodeCNHint',
   'minimaxcode-global': 'accountTypeMiniMaxCodeGlobalHint',
 }
@@ -160,6 +158,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [message, setMessage] = useState('')
   const [authUrl, setAuthUrl] = useState('')
+  const [qr, setQr] = useState('')
   const [authCopied, setAuthCopied] = useState(false)
   const [callbackUrl, setCallbackUrl] = useState('')
   const [codexLoginMethod, setCodexLoginMethod] = useState<'cli' | 'chatgpt'>('cli')
@@ -267,6 +266,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
     setPhase('idle')
     setMessage('')
     setAuthUrl('')
+    setQr('')
     setAuthCopied(false)
     setCallbackUrl('')
     setCodexLoginMethod('cli')
@@ -340,6 +340,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
   async function runBrowser() {
     setMessage('')
     setAuthUrl('')
+    setQr('')
     try {
       setPhase('busy')
       const id = await ensureAccount()
@@ -359,6 +360,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
         await new Promise((resolve) => { pollTimer.current = window.setTimeout(resolve, POLL_INTERVAL) })
         const status = await fetchLoginStatus(id)
         const login = status.login || {}
+        if (status.qr) setQr(status.qr)
         if (login.message) setMessage(login.message)
         if (login.status === 'ok') break
         if (login.status === 'error') throw new Error(login.message || 'login failed')
@@ -370,6 +372,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
       window.setTimeout(finishAndClose, 900)
     } catch (error) {
       setPhase('idle')
+      setQr('')
       setMessage(error instanceof Error ? error.message : String(error))
     }
   }
@@ -436,7 +439,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
       setMessage(t('wizardStartingSession'))
       await loginWithPat(token, id)
       setPhase('done')
-      setMessage(t(isDoubaowork ? 'cookieDone' : 'patDone'))
+      setMessage(t('patDone'))
       onAdded()
       window.setTimeout(finishAndClose, 700)
     } catch (error) {
@@ -555,27 +558,22 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
 
   const tabPending = (key: TabKey) => busy && tab === key
   const isZhipu = activeOption?.provider === 'zhipu'
-  const isDoubaowork = activeOption?.provider === 'doubaowork'
-  const patTabLabel = isDoubaowork ? t('tabCookie') : t('tabPat')
-  const patPlaceholder = isDoubaowork ? t('wizardCookiePh') : t('wizardPatPh')
   const methodOptions = [
     activeOption?.descriptor.capabilities?.browser_login !== false
       ? { value: 'browser' as const, label: t('tabBrowser') }
       : null,
-    showPatTab ? { value: 'pat' as const, label: patTabLabel } : null,
+    showPatTab ? { value: 'pat' as const, label: t('tabPat') } : null,
     showImportTab ? { value: 'import' as const, label: t('tabImport') } : null,
   ].filter(Boolean) as Array<{ value: TabKey; label: string }>
 
   const tabLead = tab === 'browser'
     ? t(activeOption?.provider === 'codex' ? 'wizardCodexBrowserLead' : 'wizardBrowserLead')
     : tab === 'pat'
-      ? t(isDoubaowork
-          ? 'wizardCookieLead'
-          : activeOption?.provider === 'command'
-            ? 'wizardPatLeadCommand'
-            : activeOption?.region === 'cn' && activeOption?.provider === 'qoder'
-              ? 'wizardPatLeadCN'
-              : 'wizardPatLead')
+      ? t(activeOption?.provider === 'command'
+          ? 'wizardPatLeadCommand'
+          : activeOption?.region === 'cn' && activeOption?.provider === 'qoder'
+            ? 'wizardPatLeadCN'
+            : 'wizardPatLead')
       : t('wizardImportLead')
 
   return (
@@ -749,6 +747,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
                         setTab(next as TabKey)
                         setMessage('')
                         setAuthUrl('')
+                        setQr('')
                         setAuthCopied(false)
                       }
                     }}
@@ -797,6 +796,14 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
                             ) : null}
                           </>
                         ) : null}
+                        {qr ? (
+                          <div className="card rounded-xl bg-surface px-3 py-3">
+                            <div className="flex justify-center">
+                              <img src={qr} alt={t('wizardScanQR')} className="size-44 rounded-lg border border-separator bg-white p-1" />
+                            </div>
+                            <p className="mt-2 text-center text-caption text-muted">{t('wizardScanQR')}</p>
+                          </div>
+                        ) : null}
                         {authUrl ? (
                           <div className="card rounded-xl bg-surface px-3 py-2.5">
                             <div className="flex items-center gap-2 text-caption">
@@ -825,7 +832,7 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
                             </div>
                           </div>
                         ) : null}
-                        {message && !authUrl ? (
+                        {message && !authUrl && !qr ? (
                           <p className="flex items-center gap-2 rounded-lg bg-surface-secondary px-3 py-2 text-caption">{isDone ? <CheckCircle size={14} className="shrink-0 text-success" /> : null}<span className={isDone ? 'font-medium text-foreground' : 'text-muted'}>{message}</span></p>
                         ) : null}
                         {showCallbackPaste ? (
@@ -847,8 +854,8 @@ export function AddAccountModal({ isOpen, onClose, onAdded }: Props) {
                       </>
                     ) : tab === 'pat' ? (
                       <>
-                        <FormRow label={patTabLabel}>
-                          <Input type="password" value={pat} onChange={(event) => setPat(event.target.value)} placeholder={patPlaceholder} aria-label={patPlaceholder} disabled={busy} />
+                        <FormRow label={t('tabPat')}>
+                          <Input type="password" value={pat} onChange={(event) => setPat(event.target.value)} placeholder={t('wizardPatPh')} aria-label={t('wizardPatPh')} disabled={busy} />
                         </FormRow>
                         {message ? (
                           <p className="flex items-center gap-2 rounded-lg bg-surface-secondary px-3 py-2 text-caption">{isDone ? <CheckCircle size={14} className="shrink-0 text-success" /> : null}<span className={isDone ? 'font-medium text-foreground' : 'text-muted'}>{message}</span></p>

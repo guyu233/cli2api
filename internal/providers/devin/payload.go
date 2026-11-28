@@ -37,6 +37,9 @@ type ChatPayload struct {
 }
 
 func BuildChatPayload(req translate.ChatRequest, catalogLevels map[string][]string) ChatPayload {
+	// Devin prompts accept images, but the tool result itself is flattened to
+	// text; keep tool-result screenshots as a trailing user image prompt.
+	req = translate.MaterializeToolResultImages(req)
 	aliases := newToolAliasMaps()
 	var systemParts []string
 	prompts := make([]Prompt, 0, len(req.Messages))

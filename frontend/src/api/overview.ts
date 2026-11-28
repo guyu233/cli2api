@@ -25,7 +25,9 @@ export function startDeviceLogin(accountId?: string, loginMethod?: string, start
 
 export function fetchLoginStatus(accountId?: string) {
   if (!accountId) throw new Error('account id required')
-  return api<{ login?: any }>(`/api/accounts/${encodeURIComponent(accountId)}/login/status`)
+  // qr is a data: URL for scan-to-login providers; the console paints it while
+  // the server-side browser waits for the phone to confirm.
+  return api<{ login?: any; qr?: string }>(`/api/accounts/${encodeURIComponent(accountId)}/login/status`)
 }
 
 export function completeLoginCallback(accountId: string, callbackUrl: string) {

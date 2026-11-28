@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/caigee-cmd/cli2api/internal/accounts"
 	"github.com/caigee-cmd/cli2api/internal/providers"
@@ -10,6 +11,9 @@ import (
 
 // buildBody converts ChatRequest into a Meta Muse Responses payload.
 func buildBody(req translate.ChatRequest, caps providers.ModelCapabilities) ([]byte, providers.ResolvedChat, error) {
+	// Meta's Responses input carries tool output as text; keep tool-result
+	// screenshots by moving them to a trailing user image turn.
+	req = translate.MaterializeToolResultImages(req)
 	obj := map[string]any{
 		"model":  req.Model,
 		"stream": true,
@@ -121,7 +125,11 @@ func responsesContent(msg translate.ChatMessage) (any, error) {
 				}
 				parts = append(parts, map[string]any{"type": partType, "text": part["text"]})
 			case "image_url":
-				parts = append(parts, map[string]any{"type": "input_image", "image_url": imageURLString(part["image_url"])})
+				url := imageURLString(part["image_url"])
+				if strings.TrimSpace(url) == "" {
+					return nil, &providers.Error{Kind: accounts.KindInvalidRequest, Status: 400, Message: "unsupported content type: image_url without url"}
+				}
+				parts = append(parts, map[string]any{"type": "input_image", "image_url": url})
 			default:
 				return nil, &providers.Error{Kind: accounts.KindInvalidRequest, Status: 400, Message: "unsupported content type: " + typ}
 			}

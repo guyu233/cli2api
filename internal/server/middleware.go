@@ -114,7 +114,7 @@ func isLivenessPath(path string) bool {
 
 func isOpenAIEndpoint(path string) bool {
 	switch path {
-	case endpoint.ModelsPath, endpoint.ChatCompletionsPath, endpoint.MessagesPath, endpoint.ResponsesPath:
+	case endpoint.ModelsPath, endpoint.ChatCompletionsPath, endpoint.MessagesPath, endpoint.CountTokensPath, endpoint.ResponsesPath:
 		return true
 	default:
 		return false

@@ -49,6 +49,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc(endpoint.ModelsPath, s.withAPIKey(s.gatewayHandler().HandleModels))
 	s.mux.HandleFunc(endpoint.ChatCompletionsPath, s.withAPIKey(s.gatewayHandler().HandleChatCompletions))
 	s.mux.HandleFunc(endpoint.MessagesPath, s.withAPIKey(s.gatewayHandler().HandleAnthropicMessages))
+	s.mux.HandleFunc(endpoint.CountTokensPath, s.withAPIKey(s.gatewayHandler().HandleAnthropicCountTokens))
 	s.mux.HandleFunc(endpoint.ResponsesPath, s.withAPIKey(s.gatewayHandler().HandleResponses))
 
 	ui := webui.Handler()

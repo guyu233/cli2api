@@ -48,6 +48,10 @@ func (h *Handler) HandleResponses(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
+	if native.Warmup() {
+		h.handleResponsesWarmup(w, native)
+		return
+	}
 	var translated translate.ResponsesTranslation
 	compat, compatErr := native.Compat()
 	if compatErr == nil {
@@ -116,7 +120,7 @@ func (h *Handler) HandleResponses(w http.ResponseWriter, r *http.Request) {
 		ConsumedCredits: result.ConsumedCredits, Model: result.Model, FinishReason: result.FinishReason,
 	}, nil, result.AttemptCount, result.ReasoningLevel)
 	response := responsesResponse(
-		execution.RequestID, firstNonEmpty(result.Model, execution.PublicModel), result.Content, result.Reasoning,
+		execution.RequestID, firstNonEmpty(execution.PublicModel, result.Model), result.Content, result.Reasoning,
 		decodeOpenAIToolCalls(result.ToolCalls), result.PromptTokens, result.CompletionTokens, result.FinishReason,
 		result.CacheReadTokens, result.CacheWriteTokens, result.CachedTokens, nil,
 	)

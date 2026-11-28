@@ -24,15 +24,22 @@ COPY --from=frontend /web/dist/ ./internal/webui/static/
 
 # ---- single runtime ----
 FROM node:20-bookworm-slim
+# Scan-to-login renders the QR in a headless Chromium inside the container
+# (no desktop, no X11): playwright-core installs a version-matched headless
+# shell below /ms-playwright.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl tini \
+  && apt-get install -y --no-install-recommends ca-certificates curl tini fonts-liberation \
   && rm -rf /var/lib/apt/lists/* \
 	  && npm install -g @qoder-ai/qodercli@1.1.32 @qodercn-ai/qoderclicn@1.1.32
 WORKDIR /app
 COPY --from=build /out/qoder-api-proxy /app/qoder-api-proxy
 COPY --from=build /out/cli2api-updater /app/cli2api-updater
 COPY worker/package.json worker/package-lock.json /app/worker/
-RUN cd /app/worker && npm ci --omit=dev
+RUN cd /app/worker \
+  && npm ci --omit=dev \
+  && npx playwright-core install --with-deps --only-shell chromium \
+  && rm -rf /var/lib/apt/lists/*
 COPY worker/src /app/worker
 COPY worker/NOTICE /app/worker/NOTICE
 COPY worker/last-plain.sample.json /app/worker/last-plain.sample.json
@@ -49,6 +56,7 @@ ENV HOST=0.0.0.0 \
     QODERCLI_JS=/usr/local/lib/node_modules/@qoder-ai/qodercli/bundle/qodercli.js \
     QODERCNCLI_JS=/usr/local/lib/node_modules/@qodercn-ai/qoderclicn/bundle/qoderclicn.js \
     PLAIN_TEMPLATE_PATH=/app/worker/last-plain.sample.json \
+    CLI2API_BROWSER_NO_SANDBOX=1 \
     QODER_WORKER_BASE_PORT=32100
 EXPOSE 3010
 ENTRYPOINT ["/usr/bin/tini","--"]

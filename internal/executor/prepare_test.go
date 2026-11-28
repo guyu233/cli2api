@@ -139,6 +139,62 @@ func TestPrepareAggregationKeyAliasesAndLogicalModels(t *testing.T) {
 	}
 }
 
+func TestPrepareAggregationKeyAcceptsSlashAlias(t *testing.T) {
+	pool := NewPool(nil, nil)
+	pool.Upsert(Item{
+		ID: "q1", Provider: "qoder", Models: []string{"kimi-k2.6"},
+		ModelAliases: map[string]string{"team/fast": "kimi-k2.6"},
+	})
+	ex := NewChatExecutor(pool, "")
+	identity := auth.KeyIdentity(accounts.APIKey{
+		ID: "key_agg", Name: "agg", Providers: []string{"qoder"}, Enabled: true, ModelAggregation: true,
+	})
+	got, err := ex.Prepare(PrepareInput{
+		Request:          translate.ChatRequest{Model: "team/fast", Messages: []translate.ChatMessage{{Role: "user", Content: "hi"}}},
+		Identity:         identity,
+		ModelAggregation: true,
+	})
+	if err != nil {
+		t.Fatalf("slash alias on aggregation key: %v", err)
+	}
+	if got.ProviderFilter != "" || got.PublicModel != "team/fast" || got.Request.Model != "team/fast" {
+		t.Fatalf("slash alias was rewritten as a provider prefix: %+v", got)
+	}
+}
+
+func TestPrepareAggregationKeyAcceptsSlashLogicalModel(t *testing.T) {
+	pool := NewPool(nil, nil)
+	pool.Upsert(Item{ID: "q1", Provider: "qoder", Models: []string{"kimi-k2.6"}})
+	ex := NewChatExecutor(pool, "")
+	identity := auth.KeyIdentity(accounts.APIKey{
+		ID: "key_agg", Name: "agg", Providers: []string{"qoder"}, Enabled: true, ModelAggregation: true,
+	})
+	const logical = "qoder/deepseek/v4-flash-1017"
+	resolver := stubAggregationResolver{agg: accounts.Aggregation{
+		ID: logical, Enabled: true,
+		Members: []accounts.AggregationMember{{Provider: "qoder", Model: "kimi-k2.6"}},
+	}}
+	got, err := ex.Prepare(PrepareInput{
+		Request:          translate.ChatRequest{Model: logical, Messages: []translate.ChatMessage{{Role: "user", Content: "hi"}}},
+		Identity:         identity,
+		ModelAggregation: true,
+		Aggregations:     resolver,
+	})
+	if err != nil {
+		t.Fatalf("slash logical model on aggregation key: %v", err)
+	}
+	plan := aggregatePlanFrom(got.Context)
+	if plan == nil || plan.ID != logical || len(plan.Members) != 1 {
+		t.Fatalf("plan=%+v", plan)
+	}
+	if got.ProviderFilter != "" {
+		t.Fatalf("virtual model must not be parsed as a provider prefix: %q", got.ProviderFilter)
+	}
+	if got.PublicModel != logical || got.Request.Model != logical {
+		t.Fatalf("public model changed: public=%q request=%q", got.PublicModel, got.Request.Model)
+	}
+}
+
 func TestPrepareAggregationKeyAcceptsLogicalModel(t *testing.T) {
 	pool := NewPool(nil, nil)
 	pool.Upsert(Item{ID: "q1", Provider: "qoder", Models: []string{"kimi-k2.6"}})

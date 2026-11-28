@@ -106,6 +106,20 @@ func (a *Accounts) PollLogin(ctx context.Context, id string) (bool, string, erro
 	}
 	return done, message, nil
 }
+
+// LoginQR returns the pending scan-to-login QR for providers that render one
+// inside the console. Providers without QR login return nil.
+func (a *Accounts) LoginQR(ctx context.Context, id string) ([]byte, error) {
+	login, err := a.login(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	qr, ok := login.(providers.LoginQRProvider)
+	if !ok {
+		return nil, nil
+	}
+	return qr.LoginQR(ctx, id)
+}
 func (a *Accounts) CompleteLogin(ctx context.Context, id, callback string) error {
 	login, err := a.login(ctx, id)
 	if err != nil {
@@ -140,13 +154,7 @@ func (a *Accounts) LoginPAT(ctx context.Context, id, token string) error {
 	if !ok {
 		return operationError("provider_unsupported", "provider does not support PAT login")
 	}
-	// Doubao Work authenticates with a pasted web-session Cookie, not a token;
-	// wrap the pasted value under "cookie" so its decoder accepts it.
-	patBody := map[string]string{"api_key": token}
-	if account.Provider == "doubaowork" {
-		patBody = map[string]string{"cookie": token}
-	}
-	payload, err := json.Marshal(patBody)
+	payload, err := json.Marshal(map[string]string{"api_key": token})
 	if err != nil {
 		return operationError("invalid_credential", err.Error())
 	}
@@ -156,9 +164,6 @@ func (a *Accounts) LoginPAT(ctx context.Context, id, token string) error {
 	}
 	if err := a.store().SaveCredentialPayload(ctx, id, importer.Format(), prepared.Payload); err != nil {
 		return operationError("credential_save_failed", err.Error())
-	}
-	if adapter.SessionInvalidator != nil {
-		adapter.SessionInvalidator.InvalidateSession(id)
 	}
 	// Record the credential kind so the card shows the right type (and enables
 	// export/filtering) instead of the create-time default "none".

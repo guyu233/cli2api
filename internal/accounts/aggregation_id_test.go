@@ -5,6 +5,37 @@ import (
 	"testing"
 )
 
+func TestPrepareCreateAggregationNormalizesMemberProviderAndModel(t *testing.T) {
+	prepared, err := PrepareCreateAggregation(CreateAggregation{
+		ID: "test-pool",
+		Members: []AggregationMember{
+			{Provider: "TestProvider", Region: "CN", Model: "testprovider/test-auto"},
+			{Provider: "testprovider", Region: "cn", Model: "test-auto"},
+			{Provider: "muse", Region: "global", Model: "muse/claude-sonnet"},
+			{Provider: "command", Region: "global", Model: "command/deepseek/deepseek-v4-pro"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prepared.Members) != 3 {
+		t.Fatalf("prefixed and bare duplicates must fold: %+v", prepared.Members)
+	}
+	byKey := map[string]AggregationMember{}
+	for _, member := range prepared.Members {
+		byKey[member.Provider+"|"+member.Model] = member
+	}
+	if _, ok := byKey["testprovider|test-auto"]; !ok {
+		t.Fatalf("testprovider prefix was not stripped: %+v", prepared.Members)
+	}
+	if _, ok := byKey["meta|claude-sonnet"]; !ok {
+		t.Fatalf("muse alias was not folded to meta: %+v", prepared.Members)
+	}
+	if _, ok := byKey["command|deepseek/deepseek-v4-pro"]; !ok {
+		t.Fatalf("command provider prefix was not stripped: %+v", prepared.Members)
+	}
+}
+
 func TestValidAggregationIDAcceptsOnlyClientSafeChars(t *testing.T) {
 	for _, id := range []string{"my-claude", "deepseek-v4.1-flash-1017", "gpt-4.1", "deepseek/v4-flash-1017", "glm-5", "a1"} {
 		if !validAggregationID(id) {

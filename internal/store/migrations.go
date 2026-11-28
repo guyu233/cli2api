@@ -294,21 +294,6 @@ ALTER TABLE aggregation_models ADD COLUMN context_length INTEGER NOT NULL DEFAUL
 ALTER TABLE aggregation_models ADD COLUMN max_output_tokens INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE aggregation_models ADD COLUMN reasoning_options TEXT NOT NULL DEFAULT '';
 ALTER TABLE aggregation_models ADD COLUMN reasoning_effort TEXT NOT NULL DEFAULT '';`},
-	{filename: "035_remove_doubaowork.sql", sql: `
-DELETE FROM account_cooldowns
- WHERE account_id IN (SELECT id FROM accounts WHERE provider = 'doubaowork');
-DELETE FROM accounts WHERE provider = 'doubaowork';`},
-	{filename: "036_checkin_claim_ledger.sql", sql: `
-CREATE TABLE IF NOT EXISTS checkin_claim_ledger (
-  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  claim_day TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  message TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  PRIMARY KEY (account_id, claim_day)
-);
-CREATE INDEX IF NOT EXISTS checkin_claim_ledger_created_at ON checkin_claim_ledger(created_at DESC);`},
 }
 
 const schemaMigrationsDDL = `

@@ -90,6 +90,13 @@ type LoginSessionProvider interface {
 	PollLogin(ctx context.Context, accountID string) (done bool, message string, err error)
 }
 
+// LoginQRProvider is implemented by scan-to-login providers whose browser runs
+// headless on the server. LoginQR returns the current QR PNG so the console can
+// render it; a nil slice means "no frame ready yet".
+type LoginQRProvider interface {
+	LoginQR(ctx context.Context, accountID string) ([]byte, error)
+}
+
 // SessionInvalidator drops an adapter's in-memory auth/session state after an
 // credential import, so the next request reloads the stored credential instead
 // of serving a warm session until its TTL expires. Adapters that keep no
@@ -307,9 +314,6 @@ type Adapter struct {
 	Prober        AccountProber
 	Checkin       AccountCheckiner
 	CheckinStatus AccountCheckinStatusReader
-	// SessionInvalidator is optional; when set, a credential import drops any
-	// warm in-memory session so the next request reloads the new credential.
-	SessionInvalidator SessionInvalidator
 	// StreamFormat declares the SSE dialect ChatStream returns (see
 	// StreamFormat* constants). Empty means chat-completions deltas.
 	StreamFormat string

@@ -387,7 +387,7 @@ func anthropicImagePart(block map[string]json.RawMessage) (map[string]any, error
 		}
 		imageURL = "data:" + mediaType + ";base64," + data
 	}
-	return map[string]any{"type": "image_url", "image_url": map[string]string{"url": imageURL}}, nil
+	return map[string]any{"type": "image_url", "image_url": map[string]any{"url": imageURL}}, nil
 }
 
 func translateAnthropicTools(raw json.RawMessage) (json.RawMessage, []string, error) {
@@ -1074,7 +1074,7 @@ func compatibilityContent(raw json.RawMessage, textTypes map[string]bool, allowI
 			if imageURL == "" {
 				return nil, fmt.Errorf("content[%d] image URL required", blockIndex)
 			}
-			parts = appendContentPart(parts, map[string]any{"type": "image_url", "image_url": map[string]string{"url": imageURL}})
+			parts = appendContentPart(parts, map[string]any{"type": "image_url", "image_url": map[string]any{"url": imageURL}})
 			continue
 		}
 		if blockType == "input_file" || blockType == "file" {

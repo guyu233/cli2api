@@ -214,7 +214,6 @@ func TestMalformedJSONAndEmptyMessagesShareErrorPriority(t *testing.T) {
 		{endpoint.ChatCompletionsPath, `{"model":"glm-5.2","messages":[]}`, "invalid_request", "messages required", http.StatusBadRequest},
 		{"/api/chat", `{"model":"glm-5.2","messages":[]}`, "invalid_request", "messages required", http.StatusBadRequest},
 		{endpoint.ResponsesPath, `{`, "invalid_request", "unexpected EOF", http.StatusBadRequest},
-		{endpoint.ResponsesPath, `{"model":"glm-5.2","input":[]}`, "invalid_request", "input required", http.StatusBadRequest},
 	}
 	for _, tc := range cases {
 		rec := serveS01(t, srv, http.MethodPost, tc.path, tc.body, "secret")
@@ -229,6 +228,13 @@ func TestMalformedJSONAndEmptyMessagesShareErrorPriority(t *testing.T) {
 	anthEmpty := serveS01(t, srv, http.MethodPost, endpoint.MessagesPath, `{"model":"glm-5.2","max_tokens":16,"messages":[]}`, "secret")
 	if anthEmpty.Code != http.StatusBadRequest || !strings.Contains(anthEmpty.Body.String(), "messages required") {
 		t.Fatalf("anthropic empty: %d %s", anthEmpty.Code, anthEmpty.Body.String())
+	}
+	// Codex CLI probes the provider with an empty input at startup. That
+	// request is answered locally as a synthetic completed response instead
+	// of spending a round trip on an empty prompt.
+	codexWarmup := serveS01(t, srv, http.MethodPost, endpoint.ResponsesPath, `{"model":"glm-5.2","input":[]}`, "secret")
+	if codexWarmup.Code != http.StatusOK || !strings.Contains(codexWarmup.Body.String(), `"status":"completed"`) {
+		t.Fatalf("codex warmup: %d %s", codexWarmup.Code, codexWarmup.Body.String())
 	}
 }
 

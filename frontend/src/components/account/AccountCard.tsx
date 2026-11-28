@@ -69,6 +69,7 @@ type Props = {
   busyKind: AccountBusyKind | ''
   authPanelOpen: boolean
   authUrl?: string
+  qr?: string
   note?: string
   pat: string
   t: Translate
@@ -117,6 +118,7 @@ export function AccountCard({
   busyKind,
   authPanelOpen,
   authUrl,
+  qr,
   note,
   pat,
   t,
@@ -509,8 +511,14 @@ export function AccountCard({
               <Button size="sm" variant="secondary" isPending={busyKind === 'pat'} onPress={onPatLogin}><Key size={14} />{t('usePat')}</Button>
             </div>
           </div>
-          {authUrl || note ? (
+          {qr || authUrl || note ? (
             <div className="text-caption">
+              {qr ? (
+                <div className="mb-2 flex flex-col items-start gap-1">
+                  <img src={qr} alt={t('wizardScanQR')} className="size-36 rounded-lg border border-separator bg-white p-1" />
+                  <span className="text-muted">{t('wizardScanQR')}</span>
+                </div>
+              ) : null}
               {authUrl ? (
                 <div>
                   <div className="mb-1 text-caption font-medium text-muted">{t('authUrl')}</div>

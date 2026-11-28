@@ -60,7 +60,7 @@ API Key:  <刚才创建的客户端密钥>
 <img src="./docs/assets/readme/request-zh.svg" width="100%" alt="客户端把请求发到本机 3010，网关选一个你自己的账号，再直连上游">
 </p>
 
-稳定接入 **Qoder（国际版 / 国内版）**、**WorkBuddy（国际版 / 国内版）**、**Trae 国内版 Work**、**华为云码道 CodeArts**。其余供应商都是实验性接入，不承诺生产可用：Devin、Command Code、Codex、Zhipu GLM、QwenWork（国际版 / 国内版）、Kimi Code（中国区）、Kiro、Muse (Meta)、豆包工作（Doubao Work）、MiniMax Code（国际版 / 国内版）。
+稳定接入 **Qoder（国际版 / 国内版）**、**WorkBuddy（国际版 / 国内版）**、**Trae 国内版 Work**、**华为云码道 CodeArts**。其余供应商都是实验性接入，不承诺生产可用：Devin、Command Code、Codex、Zhipu GLM、QwenWork（国际版 / 国内版）、Kimi Code（中国区）、Kiro、Muse (Meta)、MiniMax Code（国际版 / 国内版）。
 
 Go 网关统一鉴权、调度和记录请求。已存 PAT 的 Qoder 账号在进程内直连；仍使用旧 CLI 凭证的 Qoder 账号保留每账号一个 Node 进程和 HOME。其余供应商走进程内适配器，不为每次请求启动完整 CLI。
 

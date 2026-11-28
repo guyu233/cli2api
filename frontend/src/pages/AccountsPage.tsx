@@ -140,6 +140,7 @@ export function AccountsPage() {
   const [noteById, setNoteById] = useState<Record<string, string>>({})
   const [checkinFeedbackById, setCheckinFeedbackById] = useState<Record<string, CheckinFeedback>>({})
   const [urlById, setUrlById] = useState<Record<string, string>>({})
+  const [qrById, setQrById] = useState<Record<string, string>>({})
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [modelsId, setModelsId] = useState<string | null>(null)
   const [checkinHistoryId, setCheckinHistoryId] = useState<string | null>(null)
@@ -474,6 +475,7 @@ export function AccountsPage() {
     setAuthPanelId(id)
     await run(id, 'device', async () => {
       setNoteById((current) => ({ ...current, [id]: t('wizardStartingSession') }))
+      setQrById((current) => ({ ...current, [id]: '' }))
       const output = await startDeviceLogin(id, loginMethod)
       if (output.authUrl) {
         setUrlById((current) => ({ ...current, [id]: output.authUrl || '' }))
@@ -482,6 +484,7 @@ export function AccountsPage() {
         await new Promise((resolve) => window.setTimeout(resolve, 2000))
         const status = await fetchLoginStatus(id)
         const login = status.login || {}
+        if (status.qr) setQrById((current) => ({ ...current, [id]: status.qr || '' }))
         setNoteById((current) => ({ ...current, [id]: login.message || t('waitingQoderLogin') }))
         if (login.status === 'ok' || login.status === 'error') break
       }
@@ -1179,6 +1182,7 @@ export function AccountsPage() {
                 busyKind={busy?.id === account.id ? busy.kind : ''}
                 authPanelOpen={authPanelId === account.id}
                 authUrl={urlById[account.id]}
+                qr={qrById[account.id]}
                 note={noteById[account.id]}
                 pat={patById[account.id] || ''}
                 t={t}
